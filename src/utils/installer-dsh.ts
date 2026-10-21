@@ -188,6 +188,32 @@ async function wireProfile(dir: string, pluginDir: string): Promise<boolean> {
 }
 
 /**
+ * The spawn for one link attempt.
+ *
+ * Windows launchers are `.cmd` shims, which only cmd.exe runs, so the line goes
+ * through it with every argument quoted and anything cmd would expand refused.
+ * The program name stays bare: when cmd finds a shim through PATH under a
+ * quoted name, `%~dp0` inside it resolves to the current directory instead of
+ * the shim's own (microsoft/terminal#15212, won't fix). Shims locate their real
+ * program through `%~dp0` — the DSH desktop one included — and the current
+ * directory here is the profile, so a quoted `"dsh"` went looking for
+ * `DeepSeek Harness.exe` relative to the profile and never found it.
+ */
+export function profileLinkCommand(bin: string, args: string[], platform = process.platform) {
+  if (platform !== 'win32') return { file: bin, args, windowsVerbatimArguments: false }
+  if (!/^[\w.-]+$/.test(bin)) throw new Error(`Unsupported launcher name: ${bin}`)
+  if (!args.every(value => /^[\p{L}\p{N}_. -]+$/u.test(value))) {
+    throw new Error('Unsupported Windows profile name: shell metacharacters are not allowed')
+  }
+  const command = [bin, ...args.map(value => `"${value}"`)].join(' ')
+  return {
+    file: process.env.ComSpec || 'cmd.exe',
+    args: ['/d', '/s', '/c', `"${command}"`],
+    windowsVerbatimArguments: true,
+  }
+}
+
+/**
  * Ask the profile's own package manager to link what was just declared.
  *
  * `dsh --profile <name> plugin <args>` forwards to pnpm inside the profile
@@ -199,19 +225,6 @@ async function wireProfile(dir: string, pluginDir: string): Promise<boolean> {
  * @param name - the profile name.
  * @returns an error message, or undefined on success.
  */
-export function profileLinkCommand(bin: string, args: string[], platform = process.platform) {
-  if (platform !== 'win32') return { file: bin, args, windowsVerbatimArguments: false }
-  if (![bin, ...args].every(value => /^[\p{L}\p{N}_. -]+$/u.test(value))) {
-    throw new Error('Unsupported Windows profile name: shell metacharacters are not allowed')
-  }
-  const command = [bin, ...args].map(value => `"${value}"`).join(' ')
-  return {
-    file: process.env.ComSpec || 'cmd.exe',
-    args: ['/d', '/s', '/c', `"${command}"`],
-    windowsVerbatimArguments: true,
-  }
-}
-
 function linkProfile(dir: string, name: string): string | undefined {
   const attempts: Array<[string, string[]]> = [
     ['dsh', ['plugin', '--profile', name, 'install']],
@@ -235,7 +248,10 @@ function linkProfile(dir: string, name: string): string | undefined {
       last = String(error?.stderr?.toString?.() || error?.message || error).trim().split('\n').slice(-3).join('\n')
       // A launcher refusal includes its compatibility and profile checks. A
       // raw package-manager success must not turn that refusal into success.
-      if (bin === 'dsh' && error?.code !== 'ENOENT') return last
+      // Through cmd.exe a missing launcher is status 9009, not ENOENT; no
+      // POSIX exit status reaches that high.
+      const missing = error?.code === 'ENOENT' || error?.status === 9009
+      if (bin === 'dsh' && !missing) return last
     }
   }
   return last

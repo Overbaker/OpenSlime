@@ -111,13 +111,39 @@ describe('profile package-manager invocation', () => {
       .toEqual({ file: 'dsh', args: ['plugin', '--profile', 'my profile', 'install'], windowsVerbatimArguments: false })
   })
 
-  it('runs Windows cmd shims with quoted names and refuses shell expansion', () => {
+  it('runs Windows cmd shims under a bare name with quoted arguments, and refuses shell expansion', () => {
     const command = profileLinkCommand('dsh', ['plugin', '--profile', '中文 profile', 'install'], 'win32')
-    expect(command.args).toEqual(['/d', '/s', '/c', '""dsh" "plugin" "--profile" "中文 profile" "install""'])
+    // A quoted shim name breaks `%~dp0` inside the shim; see profileLinkCommand.
+    expect(command.args).toEqual(['/d', '/s', '/c', '"dsh "plugin" "--profile" "中文 profile" "install""'])
     expect(command.windowsVerbatimArguments).toBe(true)
     for (const name of ['a&echo secret', '%PATH%', 'a"b', 'a|b', '!TEMP!']) {
       expect(() => profileLinkCommand('dsh', ['plugin', '--profile', name, 'install'], 'win32')).toThrow(/metacharacters/)
     }
+    for (const bin of ['"dsh"', 'my dsh', 'dsh&x']) {
+      expect(() => profileLinkCommand(bin, ['install'], 'win32')).toThrow(/launcher name/)
+    }
+  })
+
+  // Only cmd.exe can show the bug, so this runs on Windows alone.
+  it.runIf(process.platform === 'win32')('lets a shim found through PATH see its own directory', async () => {
+    const { execFileSync: run } = await vi.importActual<typeof import('node:child_process')>('node:child_process')
+    const shimDir = join(dshHome, 'shim')
+    const cwd = join(dshHome, 'profiles', 'web')
+    const out = join(dshHome, 'dp0.txt')
+    await fs.ensureDir(shimDir)
+    await fs.ensureDir(cwd)
+    await fs.writeFile(join(shimDir, 'ccgshim.cmd'), '@echo %~dp0>"%CCG_DP0_OUT%"\r\n')
+
+    const command = profileLinkCommand('ccgshim', ['install'])
+    const options = {
+      cwd,
+      env: { ...process.env, PATH: `${shimDir.replace(/\//g, '\\')};${process.env.PATH}`, CCG_DP0_OUT: out },
+      windowsVerbatimArguments: command.windowsVerbatimArguments,
+    }
+    run(command.file, command.args, options)
+    // Under the bug this is the profile directory, the cwd.
+    const seen = (await fs.readFile(out, 'utf8')).trim().replace(/\\/g, '/').replace(/\/$/, '')
+    expect(seen.toLowerCase().endsWith('/shim')).toBe(true)
   })
 })
 
@@ -142,6 +168,18 @@ describe('installDshPlugin', () => {
     expect(result.profiles).toEqual([])
     expect(execFileSync).toHaveBeenCalledTimes(1)
     expect(result.warnings.join('\n')).toContain('incompatible-version')
+  })
+
+  it('falls back to pnpm when cmd.exe cannot find the launcher', async () => {
+    await makeProfile('web', profileManifest())
+    vi.mocked(execFileSync).mockImplementationOnce(() => {
+      throw Object.assign(new Error('Command failed'), { status: 9009, stderr: Buffer.from('\'dsh\' is not recognized') })
+    })
+    const result = await installDshPlugin({ dshHome })
+    expect(result.success).toBe(true)
+    expect(execFileSync).toHaveBeenCalledTimes(2)
+    const pnpm = profileLinkCommand('pnpm', ['install'])
+    expect(execFileSync).toHaveBeenLastCalledWith(pnpm.file, pnpm.args, expect.anything())
   })
 
   it('writes both halves a profile needs, and copies the plugin somewhere stable', async () => {
