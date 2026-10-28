@@ -1,5 +1,10 @@
 # Changelog
 
+## OpenSlime (fork of ccg-workflow 3.7.3, from 2026-10-28)
+
+- Slim install: no hooks or routing rules, `/osm:init|research|plan|impl|review`, cross-checked codex + antigravity, Fix Rules, `--compare`, stage reports. See FORK.md.
+- Everything below is upstream ccg-workflow history.
+
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),

@@ -70,13 +70,9 @@
     "build": "unbuild",
     "start": "node bin/ccg.mjs",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "pnpm build",
     "test": "vitest run",
     "lint": "eslint",
-    "lint:fix": "eslint --fix",
-    "docs:dev": "vitepress dev docs",
-    "docs:build": "vitepress build docs",
-    "docs:preview": "vitepress preview docs"
+    "lint:fix": "eslint --fix"
   },
   "dependencies": {
     "ansis": "^4.1.0",
@@ -103,7 +99,6 @@
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
     "unbuild": "^3.6.1",
-    "vitepress": "^1.6.4",
     "vitest": "^3.1.1"
   }
 }
