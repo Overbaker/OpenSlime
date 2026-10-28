@@ -62,11 +62,11 @@ description: 'codex/antigravity 按任务写代码，Claude 监控审查 + 归�
    ```
    Save each returned `SESSION_ID` to resume the same writer for fixes.
 
-   **Optional comparison writer** (only when `$ARGUMENTS` contains `--compare` or the user asks; doubles writing cost, use for high-risk or design-uncertain tasks):
-   - In the same message as the writer call, spawn one Claude subagent: `Agent({ subagent_type: "general-purpose", isolation: "worktree", run_in_background: true, prompt })`.
-   - Its prompt: first load the named skill with the Skill tool (e.g. `--compare=<skill>`; otherwise none), then implement the same TASK within the same FILES list, run VERIFY, and report the diff summary and VERIFY output. It must not touch the main working tree.
+   **Optional comparison writer** (only when `$ARGUMENTS` contains `--compare` or the user asks; doubles writing cost):
+   - In the same message as the writer call, spawn one subagent: `Agent({ subagent_type: "general-purpose", isolation: "worktree", run_in_background: true, prompt })`. Main Claude and the main writer never load its skills or see its draft until review.
+   - Its prompt: same TASK, FILES and VERIFY. It decides on its own, in one line each: who writes (itself, or {{FRONTEND_PRIMARY}} via `~/.claude/bin/codeagent-wrapper --backend {{FRONTEND_PRIMARY}}` inside its worktree) and which installed skill, if any, to load for this task. Then it writes, runs VERIFY, and reports: choice + reason, diff summary, VERIFY output. It must not touch the main working tree.
    - The worktree starts from `HEAD`: skip comparison for a task that depends on uncommitted earlier tasks.
-   - When both finish, give both diffs to the independent reviewer (Step 6) and keep the one that passes VERIFY with fewer Critical findings; on a tie keep the smaller diff. Discard the other; only the kept result lands in the main tree.
+   - Both diffs go to the cross review (Step 6). Keep the one that passes VERIFY with fewer Critical findings; on a tie keep the smaller diff. Only the kept result lands in the main tree.
 
 5. **Review the Diff**
    - `git diff` the task's files. Revert edits outside the allowed list.
@@ -74,7 +74,7 @@ description: 'codex/antigravity 按任务写代码，Claude 监控审查 + 归�
    - Apply the Fix Rules, then re-check the diff.
 
 6. **Independent Review**
-   - {{BACKEND_PRIMARY}} is required. Add {{FRONTEND_PRIMARY}} only when the change touches frontend/UI code or the user asks for a second opinion. When both run, launch them in ONE message with `run_in_background: true`.
+   - Always run both {{BACKEND_PRIMARY}} and {{FRONTEND_PRIMARY}}, launched in ONE message with `run_in_background: true`. They answer independently; Claude cross-checks where they agree and disagree.
 
    **Step 6.1**: Launch the calls below in ONE message:
 
@@ -88,10 +88,10 @@ description: 'codex/antigravity 按任务写代码，Claude 监控审查 + 归�
    })
    ```
 
-   **OPTIONAL SECOND Bash call ({{FRONTEND_PRIMARY}}) — frontend/UI scope only, same message**:
+   **SECOND Bash call ({{FRONTEND_PRIMARY}}) — same message**:
    ```
    Bash({
-     command: "~/.claude/bin/codeagent-wrapper --progress --backend {{FRONTEND_PRIMARY}} {{GEMINI_MODEL_FLAG}}{{GROK_MODEL_FLAG}}{{KIMI_MODEL_FLAG}}{{OPENCODE_MODEL_FLAG}}- \"{{WORKDIR}}\" <<'EOF'\nROLE_FILE: ~/.claude/.ccg/prompts/{{FRONTEND_PRIMARY}}/reviewer.md\nReview the uncommitted frontend/UI changes for <task>: broken states, accessibility, cross-module impacts.\nOUTPUT: JSON with findings\nEOF",
+     command: "~/.claude/bin/codeagent-wrapper --progress --backend {{FRONTEND_PRIMARY}} {{GEMINI_MODEL_FLAG}}{{GROK_MODEL_FLAG}}{{KIMI_MODEL_FLAG}}{{OPENCODE_MODEL_FLAG}}- \"{{WORKDIR}}\" <<'EOF'\nROLE_FILE: ~/.claude/.ccg/prompts/{{FRONTEND_PRIMARY}}/reviewer.md\nIndependently review the uncommitted changes for <task>: logic, integration and security; UI states and accessibility if UI code changed.\nOUTPUT: JSON with findings\nEOF",
      run_in_background: true,
      timeout: 300000,
      description: "{{FRONTEND_PRIMARY}}: maintainability/patterns review"
@@ -101,7 +101,7 @@ description: 'codex/antigravity 按任务写代码，Claude 监控审查 + 归�
    **Step 6.2**: Wait for every launched call to finish before synthesizing.
 
    - 后台调用完成时会自动通知，不要轮询。后端模型常需 5-15 分钟；超过 timeout 就报告用户，不要无限等待。
-   - 前端模型失败：说明原因，用后端结果继续，不重试。
+   - 某个模型失败：重试一次；仍失败就用另一方的结果继续，并在阶段报告里把置信度下调一档。
 
    - Use a fresh session (no `resume`): the writer reviewing its own work misses the same things twice.
    - Handle Critical and Warning findings with the Fix Rules, then review the changed files again in a fresh session. Stop after 3 rounds and report to the user.
@@ -131,4 +131,5 @@ Implementation is complete when:
 - [ ] Independent reviews passed
 - [ ] Side-effect review confirmed no regressions
 - [ ] Change archived successfully
+**Stage report**: before finishing, write the `impl` report (one per phase; include the comparison writer if used) as specified in `~/.claude/.ccg/prompts/claude/osm-report.md` (read it then; temporary file, includes a confidence estimate).
 <!-- CCG:SPEC:IMPL:END -->

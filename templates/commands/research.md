@@ -1,5 +1,5 @@
 ---
-description: '需求 → 约束集（并行探索 + OPSX 提案）'
+description: '需求 → 约束集（codex + antigravity 交叉探索 + OpenSpec 提案）'
 ---
 <!-- CCG:SPEC:RESEARCH:START -->
 **Core Philosophy**
@@ -46,7 +46,7 @@ description: '需求 → 约束集（并行探索 + OPSX 提案）'
    - Each boundary should be self-contained: no cross-communication needed.
 
 4. **Parallel Multi-Model Exploration**
-   - {{BACKEND_PRIMARY}} is required. Add {{FRONTEND_PRIMARY}} only when the change touches frontend/UI code or the user asks for a second opinion. When both run, launch them in ONE message with `run_in_background: true`.
+   - Always run both {{BACKEND_PRIMARY}} and {{FRONTEND_PRIMARY}}, launched in ONE message with `run_in_background: true`. They answer independently; Claude cross-checks where they agree and disagree.
    - **工作目录**：`{{WORKDIR}}` **必须通过 Bash 执行 `pwd`（Unix）或 `cd`（Windows CMD）获取当前工作目录的绝对路径**，禁止从 `$HOME` 或环境变量推断。如果用户通过 `/add-dir` 添加了多个工作区，先确定任务相关的工作区。
 
    **Output Template** (instruct both models to use this format):
@@ -75,20 +75,20 @@ description: '需求 → 约束集（并行探索 + OPSX 提案）'
    })
    ```
 
-   **OPTIONAL SECOND Bash call ({{FRONTEND_PRIMARY}} — frontend boundaries) — frontend/UI scope only, same message**:
+   **SECOND Bash call ({{FRONTEND_PRIMARY}}) — same message**:
    ```
    Bash({
-     command: "~/.claude/bin/codeagent-wrapper --progress --backend {{FRONTEND_PRIMARY}} {{GEMINI_MODEL_FLAG}}{{GROK_MODEL_FLAG}}{{KIMI_MODEL_FLAG}}{{OPENCODE_MODEL_FLAG}}- \"{{WORKDIR}}\" <<'EOF'\nExplore frontend context boundaries for <change description>:\n- Existing structures and patterns\n- Conventions in use\n- Hard constraints limiting solution space\n- Dependencies and risks\nOUTPUT: JSON using the output template above\nEOF",
+     command: "~/.claude/bin/codeagent-wrapper --progress --backend {{FRONTEND_PRIMARY}} {{GEMINI_MODEL_FLAG}}{{GROK_MODEL_FLAG}}{{KIMI_MODEL_FLAG}}{{OPENCODE_MODEL_FLAG}}- \"{{WORKDIR}}\" <<'EOF'\nIndependently explore context boundaries for <change description> from the integration and user-facing side (frontend if any):\n- Existing structures and patterns\n- Conventions in use\n- Hard constraints limiting solution space\n- Dependencies and risks\nOUTPUT: JSON using the output template above\nEOF",
      run_in_background: true,
      timeout: 300000,
-     description: "{{FRONTEND_PRIMARY}}: frontend boundary exploration"
+     description: "{{FRONTEND_PRIMARY}}: integration/user-facing exploration"
    })
    ```
 
    **Step 4.2**: Wait for every launched call to finish before synthesizing.
 
    - 后台调用完成时会自动通知，不要轮询。后端模型常需 5-15 分钟；超过 timeout 就报告用户，不要无限等待。
-   - 前端模型失败：说明原因，用后端结果继续，不重试。
+   - 某个模型失败：重试一次；仍失败就用另一方的结果继续，并在阶段报告里把置信度下调一档。
 
 5. **Aggregate and Synthesize**
    - Collect all subagent outputs.
@@ -142,4 +142,5 @@ description: '需求 → 约束集（并行探索 + OPSX 提案）'
 - OPSX CLI: `openspec status --change "<id>" --json`, `openspec list --json`
 - Check prior research: `ls openspec/changes/*/`
 - Use `AskUserQuestion` for ANY ambiguity—never assume or guess
+**Stage report**: before finishing, write the `research` report as specified in `~/.claude/.ccg/prompts/claude/osm-report.md` (read it then; temporary file, includes a confidence estimate).
 <!-- CCG:SPEC:RESEARCH:END -->

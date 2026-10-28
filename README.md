@@ -25,8 +25,9 @@ Manual install steps are in [AGENTS.md](AGENTS.md).
 - **Roles in `/osm:impl`**: `codex` writes backend/logic/tests; `antigravity` writes frontend/UI (only for UI scope). Each task lists the exact files the writer may change.
 - **Claude supervises**: Claude scopes tasks and reviews the diff.
 - **Fix Rules**: Claude fixes mechanical behavior-preserving issues of &le;5 lines itself and re-runs `VERIFY`; logic/interface changes or >5 lines go back to the writer via `resume`; after two writer failures Claude asks the user before taking over.
-- **Independent reviews**: Reviews run in a fresh session that did not write the code.
-- **Optional comparison**: `/osm:impl --compare[=<skill>]` has a Claude subagent write the same task in an isolated git worktree (optionally loading a skill); the reviewer keeps the result that passes `VERIFY` with fewer Critical findings (doubles writing cost; for high-risk tasks).
+- **Always cross-checked**: `/osm:research`, `/osm:plan` and `/osm:review` (and the review step of `/osm:impl`) run codex and antigravity independently in fresh sessions; Claude compares where they agree and disagree.
+- **Optional comparison**: `/osm:impl --compare` adds one subagent in an isolated git worktree. It decides by itself whether it or antigravity writes, and which skill to load for that task, so the main Claude and codex stay unaffected. The cross review keeps the better result.
+- **Stage report**: every `/osm:*` run ends with a temporary report under `${TMPDIR:-/tmp}/osm-reports/` with a confidence estimate (High/Medium/Low, %).
 
 ## Why it is small
 
@@ -40,7 +41,7 @@ See [PRINCIPLES.md](PRINCIPLES.md) for design rules and [FORK.md](FORK.md) for r
 
 - Node.js 20+, pnpm, git, Claude Code.
 - Codex CLI (`codex`, logged in).
-- Optional: Antigravity CLI (`agy`).
+- Antigravity CLI (`agy`, logged in).
 - OpenSpec CLI: `npm i -g @fission-ai/openspec` (or `/osm:init` installs/guides it).
 
 ## Update and uninstall

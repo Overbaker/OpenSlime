@@ -25,8 +25,9 @@ Install OpenSlime from https://github.com/Overbaker/OpenSlime. Follow AGENTS.md 
 - **`/osm:impl` 角色分工**：`codex` 编写后端/逻辑/测试；`antigravity` 编写前端/UI（仅限 UI 范围）。每个任务显式列出执行者允许修改的文件白名单。
 - **Claude 监督审查**：Claude 划定任务范围并审查代码 diff。
 - **修复规则（Fix Rules）**：保持行为不变的 &le;5 行机械性修改（拼写、import、类型标注等）由 Claude 直接修复并重新执行 `VERIFY`；涉及逻辑、分支、接口变更或 >5 行的问题通过 `resume` 退回原执行者修改；同一执行者连续失败 2 次后 Claude 征求用户意见再决定是否接管。
-- **独立审查**：审查在全新的独立会话中运行，且该会话未参与代码编写。
-- **可选对比模式**：`/osm:impl --compare[=<skill>]` 会在独立 git worktree 中启动 Claude 子 agent 编写同一任务（可指定加载 skill）；复审者选择通过 `VERIFY` 且 Critical 缺陷更少的结果（双倍编写成本，适用于高风险任务）。
+- **始终交叉**：`/osm:research`、`/osm:plan`、`/osm:review`（以及 `/osm:impl` 的审查步骤）都让 codex 和 antigravity 在新会话里各自独立完成，Claude 对比两者的一致与分歧。
+- **可选对比**：`/osm:impl --compare` 会在独立 git worktree 里另开一个子 agent，由它自己判断用自己还是 antigravity 来写、临时加载哪个 skill，主 Claude 和 codex 不受影响；交叉审查留下更好的结果。
+- **阶段报告**：每次 `/osm:*` 结束时在 `${TMPDIR:-/tmp}/osm-reports/` 下生成一份临时报告，附置信度评估（高/中/低，百分比）。
 
 ## 为何轻量
 
@@ -40,7 +41,7 @@ Install OpenSlime from https://github.com/Overbaker/OpenSlime. Follow AGENTS.md 
 
 - Node.js 20+、pnpm、git、Claude Code。
 - Codex CLI（`codex`，已登录）。
-- 可选：Antigravity CLI（`agy`）。
+- Antigravity CLI（`agy`，已登录）。
 - OpenSpec CLI：`npm i -g @fission-ai/openspec`（或由 `/osm:init` 自动引导安装）。
 
 ## 更新与卸载

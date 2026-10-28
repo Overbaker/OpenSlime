@@ -1,5 +1,5 @@
 ---
-description: '独立会话审查（codex 必选，antigravity 仅前端）→ Critical 必须修复 → 允许归档'
+description: 'codex + antigravity 独立会话交叉审查 → Critical 必须修复 → 允许归档'
 ---
 <!-- CCG:SPEC:REVIEW:START -->
 **Core Philosophy**
@@ -9,7 +9,7 @@ description: '独立会话审查（codex 必选，antigravity 仅前端）→ Cr
 - This is an independent review tool—can be used anytime, not tied to archive workflow.
 
 **Guardrails**
-- {{BACKEND_PRIMARY}} review is mandatory; {{FRONTEND_PRIMARY}} reviews only frontend/UI changes.
+- Both {{BACKEND_PRIMARY}} and {{FRONTEND_PRIMARY}} reviews are mandatory, run independently.
 - Reviewers run in fresh sessions, never the session that wrote the code.
 - Review scope is strictly limited to the proposal's changes—no scope creep.
 - Refer to `openspec/config.yaml` for project conventions when reviewing OpenSpec proposals.
@@ -26,7 +26,7 @@ description: '独立会话审查（codex 必选，antigravity 仅前端）→ Cr
    - Load relevant spec constraints and PBT properties from `openspec/changes/<id>/specs/`.
 
 3. **Multi-Model Review (PARALLEL)**
-   - {{BACKEND_PRIMARY}} is required. Add {{FRONTEND_PRIMARY}} only when the change touches frontend/UI code or the user asks for a second opinion. When both run, launch them in ONE message with `run_in_background: true`.
+   - Always run both {{BACKEND_PRIMARY}} and {{FRONTEND_PRIMARY}}, launched in ONE message with `run_in_background: true`. They answer independently; Claude cross-checks where they agree and disagree.
    - **工作目录**：`{{WORKDIR}}` **必须通过 Bash 执行 `pwd`（Unix）或 `cd`（Windows CMD）获取当前工作目录的绝对路径**，禁止从 `$HOME` 或环境变量推断。如果用户通过 `/add-dir` 添加了多个工作区，先确定任务相关的工作区。
 
    **Step 3.1**: Launch the calls below in ONE message:
@@ -41,10 +41,10 @@ description: '独立会话审查（codex 必选，antigravity 仅前端）→ Cr
    })
    ```
 
-   **OPTIONAL SECOND Bash call ({{FRONTEND_PRIMARY}}) — frontend/UI scope only, same message**:
+   **SECOND Bash call ({{FRONTEND_PRIMARY}}) — same message**:
    ```
    Bash({
-     command: "~/.claude/bin/codeagent-wrapper --progress --backend {{FRONTEND_PRIMARY}} {{GEMINI_MODEL_FLAG}}{{GROK_MODEL_FLAG}}{{KIMI_MODEL_FLAG}}{{OPENCODE_MODEL_FLAG}}- \"{{WORKDIR}}\" <<'EOF'\nReview proposal <proposal_id> implementation:\n\n## {{FRONTEND_PRIMARY}} Review Dimensions\n1. **UI Correctness**: Broken loading/empty/error states, wrong data shown\n2. **Accessibility**: Keyboard, focus, labels, contrast\n3. **Integration Risk**: Cross-module impacts, dependency changes\n4. **Frontend Security**: XSS, CSRF, sensitive data exposure\n5. **Spec Alignment**: Implementation matches spec intent (not just letter)\n\n## Rules\n- Read callers of every changed function and the tests, not only the diff.\n- Every finding needs a concrete case: this input or state leads to this wrong result. No case, no finding.\n- No style taste, no vague worries. Propose the smallest fix.\n\n## Output Format (JSON)\n{\n  \"findings\": [\n    {\n      \"severity\": \"Critical|Warning|Info\",\n      \"dimension\": \"ui|a11y|integration|security|alignment\",\n      \"file\": \"path/to/file.ts\",\n      \"line\": 42,\n      \"description\": \"What is wrong\",\n      \"spec_reference\": \"Spec section (if applicable)\",\n      \"fix_suggestion\": \"How to fix\"\n    }\n  ],\n  \"passed_checks\": [\"List of verified aspects\"],\n  \"summary\": \"Overall assessment\"\n}\nEOF",
+     command: "~/.claude/bin/codeagent-wrapper --progress --backend {{FRONTEND_PRIMARY}} {{GEMINI_MODEL_FLAG}}{{GROK_MODEL_FLAG}}{{KIMI_MODEL_FLAG}}{{OPENCODE_MODEL_FLAG}}- \"{{WORKDIR}}\" <<'EOF'\nReview proposal <proposal_id> implementation:\n\n## {{FRONTEND_PRIMARY}} Review Dimensions\n1. **Logic**: Edge cases and failure paths the first reviewer may miss\n2. **Integration Risk**: Cross-module impacts, callers, dependency changes\n3. **Security**: Input checks, XSS/CSRF, sensitive data exposure\n4. **Spec Alignment**: Implementation matches spec intent (not just letter)\n5. **UI** (only if UI code changed): broken loading/empty/error states, accessibility\n\n## Rules\n- Read callers of every changed function and the tests, not only the diff.\n- Every finding needs a concrete case: this input or state leads to this wrong result. No case, no finding.\n- No style taste, no vague worries. Propose the smallest fix.\n\n## Output Format (JSON)\n{\n  \"findings\": [\n    {\n      \"severity\": \"Critical|Warning|Info\",\n      \"dimension\": \"logic|integration|security|alignment|ui\",\n      \"file\": \"path/to/file.ts\",\n      \"line\": 42,\n      \"description\": \"What is wrong\",\n      \"spec_reference\": \"Spec section (if applicable)\",\n      \"fix_suggestion\": \"How to fix\"\n    }\n  ],\n  \"passed_checks\": [\"List of verified aspects\"],\n  \"summary\": \"Overall assessment\"\n}\nEOF",
      run_in_background: true,
      timeout: 300000,
      description: "{{FRONTEND_PRIMARY}}: patterns/integration review"
@@ -54,7 +54,7 @@ description: '独立会话审查（codex 必选，antigravity 仅前端）→ Cr
    **Step 3.2**: Wait for every launched call to finish before synthesizing.
 
    - 后台调用完成时会自动通知，不要轮询。后端模型常需 5-15 分钟；超过 timeout 就报告用户，不要无限等待。
-   - 前端模型失败：说明原因，用后端结果继续，不重试。
+   - 某个模型失败：重试一次；仍失败就用另一方的结果继续，并在阶段报告里把置信度下调一档。
 
 4. **Synthesize Findings**
    - Merge findings from both models.
@@ -114,4 +114,5 @@ Review is complete when:
 - Check spec constraints: `rg -n "CONSTRAINT:|MUST|INVARIANT:" openspec/changes/<id>/specs/`
 - View implementation diff: `git diff`
 - Archive (after passing): `/osm:impl` → Step 10
+**Stage report**: before finishing, write the `review` report as specified in `~/.claude/.ccg/prompts/claude/osm-report.md` (read it then; temporary file, includes a confidence estimate).
 <!-- CCG:SPEC:REVIEW:END -->

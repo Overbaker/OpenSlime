@@ -22,10 +22,10 @@ pnpm -v          # Required
 git --version    # Required
 claude --version # Required
 codex --version  # Required (must be logged in)
-agy --version    # Optional: Antigravity CLI
+agy --version    # Required: Antigravity CLI (must be logged in)
 openspec --version # Optional: OpenSpec CLI
 ```
-- If a required tool (`node` <20, `pnpm`, `git`, `claude`, `codex`) is missing or `codex` is not logged in: **stop** immediately and tell the user what to install or configure. Do not install global tools without the user's consent.
+- If a required tool (`node` <20, `pnpm`, `git`, `claude`, `codex`, `agy`) is missing or `codex`/`agy` is not logged in: **stop** immediately and tell the user what to install or configure. Do not install global tools without the user's consent.
 - If `openspec` is missing: offer to install it (`npm i -g @fission-ai/openspec`) or let `/osm:init` guide it.
 
 ## 3. Install Steps

@@ -1,5 +1,5 @@
 ---
-description: '多模型分析 → 消除歧义 → 零决策可执行计划'
+description: 'codex + antigravity 交叉分析 → 消除歧义 → 零决策可执行计划'
 ---
 <!-- CCG:SPEC:PLAN:START -->
 **Core Philosophy**
@@ -10,7 +10,7 @@ description: '多模型分析 → 消除歧义 → 零决策可执行计划'
 
 **Guardrails**
 - Do not proceed to implementation until every ambiguity is resolved.
-- {{BACKEND_PRIMARY}} analysis is mandatory; {{FRONTEND_PRIMARY}} joins only for frontend/UI scope.
+- Both {{BACKEND_PRIMARY}} and {{FRONTEND_PRIMARY}} analyses are mandatory, run independently.
 - If constraints cannot be fully specified, escalate to user or return to research phase.
 - Refer to `openspec/config.yaml` for project conventions.
 - **USER GUIDANCE RULE**: When suggesting next steps to the user, ALWAYS use OSM commands (`/osm:research`, `/osm:plan`, `/osm:impl`, `/osm:review`). NEVER suggest `/opsx:*` commands to the user. If OpenSpec CLI returns error messages referencing OPSX skills, translate them to `/osm:*` equivalents.
@@ -24,7 +24,7 @@ description: '多模型分析 → 消除歧义 → 零决策可执行计划'
    - Run `openspec status --change "<change_id>" --json` to review current state.
 
 2. **Multi-Model Implementation Analysis (PARALLEL)**
-   - {{BACKEND_PRIMARY}} is required. Add {{FRONTEND_PRIMARY}} only when the change touches frontend/UI code or the user asks for a second opinion. When both run, launch them in ONE message with `run_in_background: true`.
+   - Always run both {{BACKEND_PRIMARY}} and {{FRONTEND_PRIMARY}}, launched in ONE message with `run_in_background: true`. They answer independently; Claude cross-checks where they agree and disagree.
    - **工作目录**：`{{WORKDIR}}` **必须通过 Bash 执行 `pwd`（Unix）或 `cd`（Windows CMD）获取当前工作目录的绝对路径**，禁止从 `$HOME` 或环境变量推断。如果用户通过 `/add-dir` 添加了多个工作区，先确定任务相关的工作区。
 
    **Step 2.1**: Launch the calls below in ONE message:
@@ -39,26 +39,26 @@ description: '多模型分析 → 消除歧义 → 零决策可执行计划'
    })
    ```
 
-   **OPTIONAL SECOND Bash call ({{FRONTEND_PRIMARY}}) — frontend/UI scope only, same message**:
+   **SECOND Bash call ({{FRONTEND_PRIMARY}}) — same message**:
    ```
    Bash({
      command: "~/.claude/bin/codeagent-wrapper --progress --backend {{FRONTEND_PRIMARY}} {{GEMINI_MODEL_FLAG}}{{GROK_MODEL_FLAG}}{{KIMI_MODEL_FLAG}}{{OPENCODE_MODEL_FLAG}}- \"{{WORKDIR}}\" <<'EOF'\nAnalyze change <change_id> from frontend/integration perspective:\n- Maintainability assessment\n- Scalability considerations\n- Integration conflicts\nOUTPUT: JSON with analysis\nEOF",
      run_in_background: true,
      timeout: 300000,
-     description: "{{FRONTEND_PRIMARY}}: frontend analysis"
+     description: "{{FRONTEND_PRIMARY}}: integration analysis"
    })
    ```
 
    **Step 2.2**: Wait for every launched call to finish before synthesizing.
 
    - 后台调用完成时会自动通知，不要轮询。后端模型常需 5-15 分钟；超过 timeout 就报告用户，不要无限等待。
-   - 前端模型失败：说明原因，用后端结果继续，不重试。
+   - 某个模型失败：重试一次；仍失败就用另一方的结果继续，并在阶段报告里把置信度下调一档。
 
    - Synthesize responses and present consolidated options to user.
 
 3. **Uncertainty Elimination Audit**
    - **{{BACKEND_PRIMARY}}**: "Review proposal for unspecified decision points. List each as: [AMBIGUITY] → [REQUIRED CONSTRAINT]"
-   - **{{FRONTEND_PRIMARY}}** (frontend/UI scope only): "Identify implicit assumptions. Specify: [ASSUMPTION] → [EXPLICIT CONSTRAINT NEEDED]"
+   - **{{FRONTEND_PRIMARY}}**: "Identify implicit assumptions. Specify: [ASSUMPTION] → [EXPLICIT CONSTRAINT NEEDED]"
 
    **Anti-Pattern Detection** (flag and reject):
    - Information collection without decision boundaries
@@ -74,7 +74,7 @@ description: '多模型分析 → 消除歧义 → 零决策可执行计划'
 
 4. **PBT Property Extraction**
    - **{{BACKEND_PRIMARY}}**: "Extract PBT properties. For each requirement: [INVARIANT] → [FALSIFICATION STRATEGY]"
-   - **{{FRONTEND_PRIMARY}}** (frontend/UI scope only): "Define system properties: [PROPERTY] | [DEFINITION] | [BOUNDARY CONDITIONS] | [COUNTEREXAMPLE GENERATION]"
+   - **{{FRONTEND_PRIMARY}}**: "Define system properties: [PROPERTY] | [DEFINITION] | [BOUNDARY CONDITIONS] | [COUNTEREXAMPLE GENERATION]"
 
    **Property Categories**:
    - **Commutativity/Associativity**: Order-independent operations
@@ -131,4 +131,5 @@ A change is ready for implementation only when:
 - List changes: `openspec list --json`
 - Search patterns: `rg -n "INVARIANT:|PROPERTY:" openspec/`
 - Use `AskUserQuestion` for ANY ambiguity—never assume
+**Stage report**: before finishing, write the `plan` report as specified in `~/.claude/.ccg/prompts/claude/osm-report.md` (read it then; temporary file, includes a confidence estimate).
 <!-- CCG:SPEC:PLAN:END -->

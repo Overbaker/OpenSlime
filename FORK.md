@@ -28,8 +28,8 @@ models (Claude Opus/Fable, GPT-codex) already do better without it.
 
 ## Behaviour changes in the spec chain
 
-- The backend model is required; the frontend model joins only for frontend/UI scope. No retry loops, no "never stop polling".
-- `/osm:impl`: codex writes backend, antigravity writes frontend, each inside an explicit file allow-list (the wrapper already runs them with write access). Claude supervises and reviews; it fixes only mechanical ≤5-line issues itself and sends logic changes back to the writer via `resume`. Opt-in `--compare[=<skill>]` runs a Claude subagent on the same task in an isolated worktree for comparison.
+- research, plan and review always run codex and antigravity independently; a failed model is retried once, then skipped with lower confidence. No "never stop polling".
+- `/osm:impl`: codex writes backend, antigravity writes frontend, each inside an explicit file allow-list (the wrapper already runs them with write access). Claude supervises and reviews; it fixes only mechanical ≤5-line issues itself and sends logic changes back to the writer via `resume`. Opt-in `--compare` runs one subagent in an isolated worktree that picks its own writer (itself or antigravity) and skill. Every stage ends with a temporary report with a confidence estimate.
 - Commands are `/osm:init|research|plan|impl|review`; the non-OpenSpec legacy commands are removed.
 - Reviews run in a fresh session and every finding needs a concrete failing case (`prompts/*/reviewer.md`, adapted from [ponytail-review](https://github.com/DietrichGebert/ponytail), MIT).
 
