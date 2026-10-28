@@ -59,7 +59,6 @@ function findPackageRoot(): string {
 
 const PACKAGE_ROOT = findPackageRoot()
 const TEMPLATES_DIR = join(PACKAGE_ROOT, 'templates', 'commands')
-const LEGACY_TEMPLATES_DIR = join(PACKAGE_ROOT, 'templates', 'commands-legacy')
 
 // ─────────────────────────────────────────────────────────────
 // A. Workflow registry consistency
@@ -76,10 +75,9 @@ describe('workflow registry', () => {
       expect(workflow, `workflow config missing for: ${id}`).toBeDefined()
       for (const cmd of workflow!.commands) {
         const corePath = join(TEMPLATES_DIR, `${cmd}.md`)
-        const legacyPath = join(LEGACY_TEMPLATES_DIR, `${cmd}.md`)
         expect(
-          fs.existsSync(corePath) || fs.existsSync(legacyPath),
-          `template missing: ${cmd}.md (checked commands/ and commands-legacy/)`,
+          fs.existsSync(corePath),
+          `template missing: ${cmd}.md (checked commands/)`,
         ).toBe(true)
       }
     }
@@ -89,14 +87,10 @@ describe('workflow registry', () => {
     const coreFiles = readdirSync(TEMPLATES_DIR)
       .filter(f => f.endsWith('.md'))
       .map(f => f.replace('.md', ''))
-    const legacyFiles = fs.existsSync(LEGACY_TEMPLATES_DIR)
-      ? readdirSync(LEGACY_TEMPLATES_DIR).filter(f => f.endsWith('.md')).map(f => f.replace('.md', ''))
-      : []
-    const allTemplates = [...coreFiles, ...legacyFiles]
     const allCommands = getAllCommandIds()
       .flatMap(id => getWorkflowById(id)!.commands)
 
-    for (const template of allTemplates) {
+    for (const template of coreFiles) {
       expect(
         allCommands.includes(template),
         `template "${template}.md" has no workflow config`,
@@ -130,7 +124,7 @@ describe('workflow registry', () => {
 })
 
 // ─────────────────────────────────────────────────────────────
-// B. injectConfigVariables — routing & liteMode
+// B. injectConfigVariables — routing
 // ─────────────────────────────────────────────────────────────
 describe('injectConfigVariables — routing variables', () => {
   it('injects frontend primary model', () => {
@@ -180,26 +174,6 @@ describe('injectConfigVariables — routing variables', () => {
   })
 })
 
-describe('injectConfigVariables — liteMode', () => {
-  it('injects --lite flag when liteMode is true', () => {
-    const input = 'codeagent-wrapper {{LITE_MODE_FLAG}}--backend codex'
-    const result = injectConfigVariables(input, { liteMode: true })
-    expect(result).toBe('codeagent-wrapper --lite --backend codex')
-  })
-
-  it('injects empty string when liteMode is false', () => {
-    const input = 'codeagent-wrapper {{LITE_MODE_FLAG}}--backend codex'
-    const result = injectConfigVariables(input, { liteMode: false })
-    expect(result).toBe('codeagent-wrapper --backend codex')
-  })
-
-  it('injects empty string when liteMode is not specified', () => {
-    const input = 'codeagent-wrapper {{LITE_MODE_FLAG}}--backend codex'
-    const result = injectConfigVariables(input, {})
-    expect(result).toBe('codeagent-wrapper --backend codex')
-  })
-})
-
 // ─────────────────────────────────────────────────────────────
 // C. Template variable completeness
 // ─────────────────────────────────────────────────────────────
@@ -236,7 +210,6 @@ describe('template variable completeness', () => {
           backend: { models: ['codex'], primary: 'codex' },
           review: { models: ['codex', 'gemini'] },
         },
-        liteMode: false,
         mcpProvider: 'ace-tool',
       })
 
@@ -434,7 +407,7 @@ describe('skills namespace isolation', () => {
     await fs.remove(userSkillDir)
   })
 
-  it('migrates old v1.7.73 layout to skills/ccg/', { timeout: 30_000 }, async () => {
+  it('retires old v1.7.73 layout before skills migration', { timeout: 30_000 }, async () => {
     const migrateDir = join(tmpdir(), `ccg-test-migrate-${Date.now()}`)
 
     // Simulate old layout: skills/{tools,orchestration,SKILL.md,run_skill.js}
@@ -456,10 +429,12 @@ describe('skills namespace isolation', () => {
     })
     expect(result.success).toBe(true)
 
-    // CCG skills moved to skills/ccg/
-    expect(fs.existsSync(join(migrateDir, 'skills', 'ccg', 'SKILL.md'))).toBe(true)
-    expect(fs.existsSync(join(migrateDir, 'skills', 'ccg', 'tools'))).toBe(true)
-    expect(fs.existsSync(join(migrateDir, 'skills', 'ccg', 'orchestration'))).toBe(true)
+    const [stamp] = await fs.readdir(join(migrateDir, '.ccg-retired'))
+    for (const name of ['SKILL.md', 'run_skill.js', 'tools', 'orchestration']) {
+      expect(await fs.pathExists(join(migrateDir, 'skills', 'ccg', name))).toBe(false)
+      expect(await fs.pathExists(join(migrateDir, '.ccg-retired', stamp, 'skills', name))).toBe(true)
+    }
+    expect(await fs.readFile(join(migrateDir, '.ccg-retired', stamp, 'skills', 'tools', 'verify-security', 'SKILL.md'), 'utf8')).toBe('# Old Security')
 
     // User skill untouched at original location
     expect(fs.existsSync(join(migrateDir, 'skills', 'brainstorming', 'SKILL.md'))).toBe(true)

@@ -5,22 +5,21 @@
     "url": "https://github.com/fengshao1227"
   },
   "metadata": {
-    "description": "CCG multi-model collaboration system — install the skills natively via Claude Code plugins, or the full workflow (commands + hooks + binary) via `npx ccg-workflow`.",
+    "description": "OpenSlime skills \u2014 install natively via Claude Code plugins, or install the /osm:* workflow and codeagent-wrapper from the OpenSlime repository.",
     "version": "3.7.3"
   },
   "plugins": [
     {
       "name": "ccg",
       "source": ".",
-      "description": "All CCG skills in one install: bt-panel / seo-page-builder / adsense-site-auditor / scrapling, the verify-* quality gates + gen-docs, the Impeccable-fused frontend-design skill, and 60+ domain-knowledge references. Invoked as /ccg:<skill>.",
+      "description": "OpenSlime skills: frontend-design with Impeccable playbooks, scrapling, seo-page-builder with SEO references, bt-panel, and adsense-site-auditor.",
       "version": "3.7.3",
       "category": "workflow",
       "keywords": [
         "skills",
         "deployment",
         "seo",
-        "frontend-design",
-        "code-review"
+        "frontend-design"
       ]
     }
   ]

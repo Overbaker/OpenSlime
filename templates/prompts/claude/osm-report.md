@@ -1,8 +1,8 @@
 # OpenSlime stage report (Claude)
 
-Write one at the end of every /osm:research, /osm:plan, /osm:impl and /osm:review run.
+Write one at the end of every /osm:research, /osm:plan and /osm:review run, and one per phase of /osm:impl.
 
-Path: `${TMPDIR:-/tmp}/osm-reports/<repo-name>/<change-id>/<stage>.md` (temporary; overwrite on re-run; never commit). Show the path and the Confidence line in chat.
+Path: `${TMPDIR:-/tmp}/osm-reports/<repo-name>/<change-id>/<stage>.md` for research/plan/review; `${TMPDIR:-/tmp}/osm-reports/<repo-name>/<change-id>/impl-<phase>.md` for impl (use the phase identifier from tasks.md). Reports are temporary; overwrite the same stage or phase on re-run; never commit. Show the path and the Confidence line in chat.
 
 ```markdown
 # <stage> — <change-id> — <date>

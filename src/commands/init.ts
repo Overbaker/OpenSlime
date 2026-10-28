@@ -1,3 +1,4 @@
+import { FORK_UPDATE_COMMAND } from '../utils/fork-update'
 import type { CollaborationMode, InitOptions, ModelRouting, ModelType, SupportedLang } from '../types'
 import ansis from 'ansis'
 import fs from 'fs-extra'
@@ -7,12 +8,12 @@ import { homedir } from 'node:os'
 import { join } from 'pathe'
 import { i18n, initI18n } from '../i18n'
 import { createDefaultConfig, ensureCcgDir, getCcgDir, readCcgConfig, writeCcgConfig } from '../utils/config'
-import { configureGeminiCliApi, configureSponsorForCodex, getAllCommandIds, getCoreCommandIds, getSponsor, installAceTool, installAceToolRs, installContextWeaver, installFastContext, installMcpServer, installWorkflows, promptSponsorInit, showBinaryDownloadWarning, sponsorInquirerChoices, syncMcpToCodex, syncMcpToGemini, writeFastContextPrompt } from '../utils/installer'
+import { configureGeminiCliApi, configureSponsorForCodex, getCoreCommandIds, getSponsor, installAceTool, installAceToolRs, installContextWeaver, installFastContext, installMcpServer, installWorkflows, promptSponsorInit, showBinaryDownloadWarning, sponsorInquirerChoices, syncMcpToCodex, syncMcpToGemini, writeFastContextPrompt } from '../utils/installer'
 import { isWindows } from '../utils/platform'
 import { migrateToV1_4_0, needsMigration } from '../utils/migration'
 import { promptOpencodeModel } from '../utils/model-selection'
 import { PACKAGE_ROOT } from '../utils/installer-template'
-import { getSkillCatalog, installedNames, resolveSkillPaths, SKILL_MANIFEST_FILE } from '../utils/skill-manager'
+import { getSkillCatalog, installedNames, removeSkills, resolveSkillPaths, SKILL_MANIFEST_FILE } from '../utils/skill-manager'
 
 /**
  * Auto-approve codeagent-wrapper Bash commands in settings.json.
@@ -20,10 +21,16 @@ import { getSkillCatalog, installedNames, resolveSkillPaths, SKILL_MANIFEST_FILE
  * All platforms use permissions.allow with wildcard pattern (v1.7.89+).
  * Old Hook-based approach and old permission entries are automatically cleaned up.
  */
-async function installHook(settingsPath: string): Promise<'permission'> {
+async function installHook(settingsPath: string): Promise<'permission' | 'skipped'> {
   let settings: Record<string, any> = {}
   if (await fs.pathExists(settingsPath)) {
-    settings = await fs.readJSON(settingsPath)
+    try {
+      settings = JSON.parse(await fs.readFile(settingsPath, 'utf-8'))
+    }
+    catch {
+      console.warn('Warning: settings.json could not be parsed; permission setup skipped and file preserved.')
+      return 'skipped'
+    }
   }
 
   // ── All platforms: permissions.allow approach (v1.7.89+) ──
@@ -132,7 +139,7 @@ For example, when using the \`fastapi\` library to encapsulate an API endpoint, 
 // "← back" (step 2+) and "× cancel". Users can also jump to any
 // step from the final summary page.
 
-type StepId = 'api' | 'model' | 'mcp' | 'perf'
+type StepId = 'api' | 'model' | 'mcp' | 'skills'
 type StepReturn = 'next' | 'back' | 'cancel'
 type SummaryAction = 'confirm' | 'cancel' | StepId
 
@@ -237,7 +244,6 @@ export async function init(options: InitOptions = {}): Promise<void> {
   let opencodeModel = ''
   const mode: CollaborationMode = 'smart'
   let selectedWorkflows = getCoreCommandIds()
-  let installMode: 'v3' | 'legacy' = 'v3'
 
   // Non-interactive mode: preserve existing config
   if (options.skipPrompt) {
@@ -250,21 +256,8 @@ export async function init(options: InitOptions = {}): Promise<void> {
       kimiModel = existingConfig.routing.kimiModel || ''
       opencodeModel = existingConfig.routing.opencodeModel || ''
     }
-    // Preserve install mode: if existing install has legacy commands, keep them
-    if (existingConfig?.workflows?.installed) {
-      const hadLegacy = existingConfig.workflows.installed.some(
-        (w: string) => ['workflow', 'plan', 'execute', 'frontend', 'backend', 'feat', 'debug', 'team'].includes(w),
-      )
-      if (hadLegacy) {
-        selectedWorkflows = getAllCommandIds()
-        installMode = 'legacy'
-      }
-    }
   }
 
-  // Performance mode selection
-  let liteMode = false
-  let skipImpeccable = false
   let skillsProfile: string[] | undefined
   let selectedSkillsMode: 'legacy' | 'native' | undefined
   const skillPaths = resolveSkillPaths({
@@ -299,6 +292,10 @@ export async function init(options: InitOptions = {}): Promise<void> {
     skillsProfile = requestedProfile
     selectedSkillsMode = 'native'
   }
+
+  const catalogNames = new Set(skillCatalog.map(skill => skill.name))
+  const retiredSkills = skillsProfile?.filter(name => !catalogNames.has(name)) || []
+  skillsProfile = skillsProfile?.filter(name => catalogNames.has(name))
 
   // MCP Tool Selection
   let mcpProvider = 'fast-context'
@@ -335,12 +332,6 @@ export async function init(options: InitOptions = {}): Promise<void> {
   // ═══════════════════════════════════════════════════════
   if (options.skipPrompt) {
     const existingConfig = await readCcgConfig()
-    if (existingConfig?.performance?.liteMode !== undefined) {
-      liteMode = existingConfig.performance.liteMode
-    }
-    if (existingConfig?.performance?.skipImpeccable !== undefined) {
-      skipImpeccable = existingConfig.performance.skipImpeccable
-    }
     if (options.skipMcp) {
       // Fix #124: preserve existing MCP provider from config during update
       mcpProvider = existingConfig?.mcp?.provider || 'skip'
@@ -373,9 +364,6 @@ export async function init(options: InitOptions = {}): Promise<void> {
         kimiModel = existingConfig.routing.kimiModel
       if (existingConfig.routing.opencodeModel)
         opencodeModel = existingConfig.routing.opencodeModel
-    }
-    if (existingConfig?.performance?.liteMode !== undefined) {
-      liteMode = existingConfig.performance.liteMode
     }
 
     // ── Step runners (closures sharing outer-scope state) ──
@@ -821,32 +809,7 @@ export async function init(options: InitOptions = {}): Promise<void> {
       return 'next'
     }
 
-    async function runPerfStep(canGoBack: boolean): Promise<StepReturn> {
-      console.log()
-      console.log(ansis.cyan.bold(`  ⚡ Step 4/4 — ${i18n.t('init:perf.title')}`))
-      console.log()
-
-      const { perfMode } = await inquirer.prompt([{
-        type: 'list',
-        name: 'perfMode',
-        message: i18n.t('init:perf.selectMode'),
-        choices: [
-          { name: `${ansis.green('●')} ${i18n.t('init:perf.standardOption')}`, value: 'standard' },
-          { name: `${ansis.cyan('●')} ${i18n.t('init:perf.liteOption')}`, value: 'lite' },
-          ...navSentinels(canGoBack),
-        ],
-        default: liteMode ? 'lite' : 'standard',
-      }])
-
-      if (perfMode === BACK_SENTINEL)
-        return 'back'
-      if (perfMode === CANCEL_SENTINEL)
-        return 'cancel'
-
-      liteMode = perfMode === 'lite'
-
-      selectedWorkflows = getCoreCommandIds()
-      skipImpeccable = true
+    async function runSkillsStep(canGoBack: boolean): Promise<StepReturn> {
       if (requestedSkills === undefined) {
         const { skillsMode } = await inquirer.prompt([{
           type: 'list',
@@ -855,9 +818,12 @@ export async function init(options: InitOptions = {}): Promise<void> {
           choices: [
             { name: language === 'zh-CN' ? '保留兼容安装（原有 Skills 体系）' : 'Keep the legacy Skills installation', value: 'legacy' },
             { name: language === 'zh-CN' ? '按需选择（可全部取消）' : 'Choose individual skills (can leave empty)', value: 'custom' },
+            ...navSentinels(canGoBack),
           ],
           default: skillsProfile === undefined ? 'legacy' : 'custom',
         }])
+        if (skillsMode === BACK_SENTINEL) return 'back'
+        if (skillsMode === CANCEL_SENTINEL) return 'cancel'
         if (skillsMode === 'legacy') {
           skillsProfile = undefined
         }
@@ -920,7 +886,6 @@ export async function init(options: InitOptions = {}): Promise<void> {
         return ansis.gray(i18n.t('init:summary.skipped'))
       })()
       console.log(`  ${ansis.cyan(i18n.t('init:summary.mcpTool'))}      ${mcpSummary}`)
-      console.log(`  ${ansis.cyan(i18n.t('init:summary.webUI'))}        ${liteMode ? ansis.gray(i18n.t('init:summary.disabled')) : ansis.green(i18n.t('init:summary.enabled'))}`)
       console.log(`  ${ansis.cyan('Native Skills:')} ${skillsProfile === undefined ? (language === 'zh-CN' ? '兼容安装' : 'Legacy installation') : skillsProfile.join(', ') || (language === 'zh-CN' ? '无' : 'None')}`)
       if (wantGrokSearch) {
         console.log(`  ${ansis.cyan('grok-search')}    ${tavilyKey ? ansis.green('✓') : ansis.yellow(`(${i18n.t('init:summary.pendingConfig')})`)}`)
@@ -938,7 +903,7 @@ export async function init(options: InitOptions = {}): Promise<void> {
           { name: `${ansis.cyan('✎')} ${i18n.t('init:summaryMenu.editApi')}`, value: 'api' },
           { name: `${ansis.cyan('✎')} ${i18n.t('init:summaryMenu.editModel')}`, value: 'model' },
           { name: `${ansis.cyan('✎')} ${i18n.t('init:summaryMenu.editMcp')}`, value: 'mcp' },
-          { name: `${ansis.cyan('✎')} ${i18n.t('init:summaryMenu.editPerf')}`, value: 'perf' },
+          { name: `${ansis.cyan('✎')} ${i18n.t('init:summaryMenu.editSkills')}`, value: 'skills' },
           new inquirer.Separator(),
           { name: `${ansis.red('×')} ${i18n.t('init:summaryMenu.cancel')}`, value: 'cancel' },
         ],
@@ -953,7 +918,7 @@ export async function init(options: InitOptions = {}): Promise<void> {
     // driven by sentinels inside each step's first list prompt. The
     // summary page is a separate jump-back menu that can land on any
     // step; after completing that jumped-to step we return to summary.
-    const stepOrder: StepId[] = ['api', 'model', 'mcp', 'perf']
+    const stepOrder: StepId[] = ['api', 'model', 'mcp', 'skills']
     let stepIdx = 0
     let jumpingToSummary = false
 
@@ -973,8 +938,8 @@ export async function init(options: InitOptions = {}): Promise<void> {
           case 'mcp':
             result = await runMcpStep(canGoBack)
             break
-          case 'perf':
-            result = await runPerfStep(canGoBack)
+          case 'skills':
+            result = await runSkillsStep(canGoBack)
             break
         }
 
@@ -1057,6 +1022,13 @@ export async function init(options: InitOptions = {}): Promise<void> {
   const spinner = ora(i18n.t('init:installing')).start()
 
   try {
+    if (retiredSkills.length) {
+      const managed = await installedNames(skillPaths)
+      const retiredManaged = retiredSkills.filter(name => managed.includes(name))
+      if (retiredManaged.length)
+        await removeSkills(retiredManaged, skillPaths)
+    }
+
     // v1.4.0: Auto-migrate from old directory structure
     if (await needsMigration()) {
       spinner.text = 'Migrating from v1.3.x to v1.4.0...'
@@ -1097,8 +1069,6 @@ export async function init(options: InitOptions = {}): Promise<void> {
       routing,
       installedWorkflows: selectedWorkflows,
       mcpProvider,
-      liteMode,
-      skipImpeccable,
       skillsProfile,
       skillsMode: selectedSkillsMode,
     })
@@ -1110,9 +1080,7 @@ export async function init(options: InitOptions = {}): Promise<void> {
     const installDir = options.installDir || join(homedir(), '.claude')
     const result = await installWorkflows(selectedWorkflows, installDir, options.force, {
       routing,
-      liteMode,
       mcpProvider,
-      skipImpeccable,
       skillsProfile,
       skillsMode: selectedSkillsMode,
     })
@@ -1250,9 +1218,10 @@ export async function init(options: InitOptions = {}): Promise<void> {
     }
 
     // Always install codeagent-wrapper auto-approve via permissions.allow
-    await installHook(settingsPath)
-    console.log()
-    console.log(`    ${ansis.green('✓')} ${i18n.t('init:hooks.installed')} ${ansis.gray('(permissions.allow)')}`)
+    if (await installHook(settingsPath) === 'permission') {
+      console.log()
+      console.log(`    ${ansis.green('✓')} ${i18n.t('init:hooks.installed')} ${ansis.gray('(permissions.allow)')}`)
+    }
 
     // Install grok-search MCP if requested
     if (wantGrokSearch && (tavilyKey || firecrawlKey || grokApiUrl || grokApiKey)) {
@@ -1402,7 +1371,7 @@ export async function init(options: InitOptions = {}): Promise<void> {
       if (!result.success) {
         console.log()
         console.log(ansis.yellow(`  尝试修复 / Try to fix:`))
-        console.log(ansis.cyan(`    npx ccg-workflow@latest init --force`))
+        console.log(ansis.cyan(`    ${FORK_UPDATE_COMMAND}`))
         console.log(ansis.gray(`    如仍失败，请提交 issue 并附上以上错误信息`))
         console.log(ansis.gray(`    If still failing, report an issue with the errors above`))
       }

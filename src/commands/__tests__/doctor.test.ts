@@ -61,6 +61,14 @@ describe('CCG doctor inventory', () => {
     expect(exec).not.toHaveBeenCalled()
   })
 
+  it('recognizes bundled nested skills without the retired root index', async () => {
+    await config()
+    await claudeInstall()
+    await fs.outputFile(join(home, '.claude', 'skills', 'ccg', 'domains', 'frontend-design', 'SKILL.md'), '# Skill')
+    const report = await collectDoctorReport(deps())
+    expect(report.checks.find(c => c.id === 'claude.skills')).toMatchObject({ status: 'pass', detail: 'Legacy bundled skills found' })
+  })
+
   it('includes review-only backends and reports missing selected CLI only', async () => {
     await config('claude', 'claude', ['codex', 'gemini'])
     await claudeInstall()
@@ -71,6 +79,51 @@ describe('CCG doctor inventory', () => {
     expect(report.checks.find(c => c.id === 'cli.gemini')?.status).toBe('pass')
     expect(exec.mock.calls.map(call => call[0])).toEqual(['claude', 'codex', 'gemini'])
     expect(report.checks.some(c => c.id === 'cli.grok')).toBe(false)
+  })
+
+  it.each([
+    undefined,
+    '{invalid',
+    '{}',
+    'null',
+    '{"permissions":{"allow":"command(*)"}}',
+    '{"permissions":{"allow":[null,42,"read(*)"]}}',
+    '{"permissions":{"allow":["command(git status)"]}}',
+  ])('warns without changing missing or invalid Antigravity permissions: %s', async (content) => {
+    await config('antigravity')
+    await claudeInstall()
+    await fs.outputFile(join(home, '.claude', 'bin', 'codeagent-wrapper'), 'binary')
+    const path = join(home, '.gemini', 'antigravity-cli', 'settings.json')
+    if (content !== undefined) await fs.outputFile(path, content)
+    const report = await collectDoctorReport(deps())
+    expect(report.failureCount).toBe(0)
+    expect(report.checks.find(c => c.id === 'antigravity.permissions')).toMatchObject({
+      status: 'warn',
+      remediation: 'Allow agy shell tools in headless mode: add "command(*)" to permissions.allow in ~/.gemini/antigravity-cli/settings.json (ask the user first).',
+    })
+    if (content === undefined) expect(await fs.pathExists(path)).toBe(false)
+    else expect(await fs.readFile(path, 'utf8')).toBe(content)
+  })
+
+  it.each(['command(*)'])('accepts %s for review-only Antigravity using the injected Gemini directory', async (rule) => {
+    await config('claude', 'claude', ['antigravity'])
+    await claudeInstall()
+    const geminiDir = join(home, 'custom-gemini')
+    const path = join(geminiDir, 'antigravity-cli', 'settings.json')
+    const content = JSON.stringify({ permissions: { allow: ['read(*)', rule] } })
+    await fs.outputFile(path, content)
+    const report = await collectDoctorReport(deps({ geminiDir }))
+    expect(report.checks.find(c => c.id === 'antigravity.permissions')).toMatchObject({ status: 'pass', remediation: null })
+    expect(await fs.readFile(path, 'utf8')).toBe(content)
+    expect(await fs.pathExists(join(home, '.gemini'))).toBe(false)
+  })
+
+  it('omits the Antigravity permission check when that backend is not selected', async () => {
+    await config()
+    await claudeInstall()
+    const report = await collectDoctorReport(deps())
+    expect(report.checks.some(c => c.id === 'antigravity.permissions')).toBe(false)
+    expect(await fs.pathExists(join(home, '.gemini'))).toBe(false)
   })
 
   it('checks Codex artifacts without requiring Claude hooks or commands', async () => {
@@ -120,6 +173,7 @@ describe('CCG doctor inventory', () => {
     const report = await doctor({}, deps({ output, setExitCode: vi.fn() }))
     expect(report.failureCount).toBe(0)
     expect(report.checks.find(c => c.id === 'cli.delegation.antigravity')?.status).toBe('warn')
+    expect(report.checks.find(c => c.id === 'antigravity.permissions')?.status).toBe('warn')
     expect(report.checks.find(c => c.id === 'cli.delegation.claude')?.status).toBe('warn')
     const text = output.mock.calls.map(call => call[0]).join('\n')
     expect(text).toContain(`No failures; ${report.warningCount} warning(s).`)
@@ -139,15 +193,6 @@ describe('CCG doctor inventory', () => {
     expect(JSON.stringify(malformed)).not.toContain('secret-token')
   })
 
-  it('passes without hooks and warns about hooks left by a full install', async () => {
-    await config()
-    await claudeInstall()
-    const clean = await collectDoctorReport(deps())
-    expect(clean.checks.find(c => c.id === 'claude.hooks')).toMatchObject({ status: 'pass', detail: 'no per-turn hooks' })
-    await fs.outputJSON(join(home, '.claude', 'settings.json'), { hooks: { UserPromptSubmit: [{ hooks: [{ type: 'command', command: `node "${join(home, '.claude', 'hooks', 'ccg', 'skill-router.js')}"` }] }] } })
-    const stale = await collectDoctorReport(deps())
-    expect(stale.checks.find(c => c.id === 'claude.hooks')).toMatchObject({ status: 'warn', detail: 'legacy CCG hooks present (1 registered); run ccg init to remove' })
-  })
 
   it('outputs standalone JSON without ANSI or secrets and sets nonzero failure exit code', async () => {
     await config()

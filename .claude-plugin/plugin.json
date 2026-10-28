@@ -1,6 +1,6 @@
 {
   "name": "ccg",
-  "description": "CCG skills bundle — website ops (BaoTa/aaPanel deploy, SEO tool-page builder, AdSense auditor, web scraping), built-in quality gates (security/quality/change/module + doc generation), and an Impeccable-fused frontend-design system. Skills only; the full multi-model orchestration (Claude+Codex+Gemini+Grok+Kimi) installs via `npx ccg-workflow`.",
+  "description": "OpenSlime skills bundle: frontend-design with Impeccable playbooks, scrapling, seo-page-builder with SEO references, bt-panel, and adsense-site-auditor. Skills only; install the /osm:* workflow and codeagent-wrapper from the OpenSlime repository.",
   "version": "3.7.3",
   "author": {
     "name": "fengshao1227",
@@ -17,9 +17,7 @@
     "seo",
     "adsense",
     "web-scraping",
-    "frontend-design",
-    "code-review",
-    "quality-gate"
+    "frontend-design"
   ],
   "skills": "./templates/skills"
 }

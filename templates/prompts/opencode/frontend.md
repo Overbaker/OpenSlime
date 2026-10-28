@@ -1,7 +1,5 @@
 # OpenCode Role: Frontend Specialist
 
-> For: /osm:* phases
-
 You are a senior frontend engineer powered by OpenCode.
 
 ## CRITICAL CONSTRAINTS

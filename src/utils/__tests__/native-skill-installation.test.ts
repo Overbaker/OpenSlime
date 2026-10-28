@@ -2,7 +2,7 @@ import { mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'pathe'
 import fs from 'fs-extra'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { installWorkflows, uninstallWorkflows } from '../installer'
 import { installedNames, listSkills } from '../skill-manager'
 
@@ -66,6 +66,23 @@ describe('native skill integration', () => {
     expect(result.errors.join('\n')).toMatch(/conflict|ownership|preserved/i)
     expect(await fs.readFile(userFile, 'utf8')).toBe('user-owned')
   }, 30_000)
+
+  it.each(['\uFEFF{}', '{"hooks": {},}'])('preserves malformed settings and warns without failing install', async (content) => {
+    const root = await setup()
+    const settingsPath = join(root, 'settings.json')
+    await fs.writeFile(settingsPath, content)
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      const result = await installWorkflows(['plan'], root, true, { skillsProfile: [], mcpProvider: 'skip' })
+      expect(result.success).toBe(true)
+      expect(result.errors).toEqual([])
+      expect(await fs.readFile(settingsPath, 'utf8')).toBe(content)
+      expect(warning).toHaveBeenCalledWith(expect.stringContaining('file preserved'))
+    }
+    finally {
+      warning.mockRestore()
+    }
+  })
 
   it('removes hooks, routing rules and dropped files left by a full install, keeping user hooks', async () => {
     const root = await setup()

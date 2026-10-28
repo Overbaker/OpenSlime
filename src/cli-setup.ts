@@ -8,6 +8,7 @@ import { configMcp } from './commands/config-mcp'
 import { doctor, status } from './commands/doctor'
 import { diagnoseMcp, fixMcp } from './commands/diagnose-mcp'
 import { init } from './commands/init'
+import { update } from './commands/update'
 import { showMainMenu } from './commands/menu'
 import { registerSkillCommands } from './commands/skills'
 import { i18n, initI18n } from './i18n'
@@ -148,6 +149,9 @@ export async function setupCommands(cli: CAC): Promise<void> {
         console.log(ansis.gray(i18n.t('common:availableSubcommands', { list: 'mcp' })))
       }
     })
+
+  cli.command('update', 'Show the OpenSlime checkout update command')
+    .action(async () => { await update() })
 
   // Doctor: environment health check
   cli

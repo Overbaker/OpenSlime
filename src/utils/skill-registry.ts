@@ -243,11 +243,9 @@ export function collectInvocableSkills(skillsDir: string): SkillMeta[] {
  * Generate slash command content for a user-invocable skill.
  *
  * For knowledge skills: instructs Claude to read the SKILL.md and follow its guidance.
- * For scripted skills: runs the script via run_skill.js.
  */
 export function generateCommandContent(skill: SkillMeta, skillsInstallDir: string): string {
   const skillMdPath = join(skillsInstallDir, skill.relPath, 'SKILL.md')
-  const runSkillPath = join(skillsInstallDir, 'run_skill.js')
 
   // Frontmatter is REQUIRED — CC command parser fails on files without it,
   // cascading to break ALL commands in the same directory (and beyond).
@@ -257,7 +255,8 @@ export function generateCommandContent(skill: SkillMeta, skillsInstallDir: strin
     '---',
   ].join('\n')
 
-  if (skill.runtimeType === 'scripted') {
+  if (skill.runtimeType === 'scripted' && skill.scriptPath) {
+    const scriptPath = join(skillsInstallDir, skill.relPath, 'scripts', basename(skill.scriptPath))
     return [
       frontmatter,
       '',
@@ -270,7 +269,7 @@ export function generateCommandContent(skill: SkillMeta, skillsInstallDir: strin
       '执行以下命令：',
       '',
       '```bash',
-      `node "${runSkillPath}" ${skill.name} $ARGUMENTS`,
+      `node "${scriptPath}" $ARGUMENTS`,
       '```',
       '',
       `如需了解此技能的详细说明，请读取: ${skillMdPath}`,

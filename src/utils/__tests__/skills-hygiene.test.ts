@@ -1,7 +1,7 @@
 import fs from 'fs-extra'
 import { join } from 'pathe'
 import { describe, expect, it } from 'vitest'
-import { collectSkills } from '../skill-registry'
+import { collectSkills, generateCommandContent } from '../skill-registry'
 
 const SKILLS_DIR = join(__dirname, '../../../templates/skills')
 
@@ -98,6 +98,13 @@ describe('skills registry — v3.5.1 additions are wired up', () => {
       expect(skill!.userInvocable).toBe(true)
     },
   )
+
+  it('generates scripted commands using the installed script directly', () => {
+    const skill = { ...byName.get('bt-panel')!, runtimeType: 'scripted' as const, scriptPath: '/templates/bt-panel/scripts/run.js' }
+    const content = generateCommandContent(skill, '/installed/skills/ccg')
+    expect(content).toContain('node "/installed/skills/ccg/bt-panel/scripts/run.js" $ARGUMENTS')
+    expect(content).not.toContain('run_skill.js')
+  })
 
   it('bt-panel ships its executable scripts, not just docs', () => {
     for (const f of ['bt_client.py', 'bt_deploy.py', 'sites.example.json']) {

@@ -1,3 +1,4 @@
+import { FORK_UPDATE_COMMAND } from './fork-update'
 import fs from 'fs-extra'
 import { execFileSync } from 'node:child_process'
 import { homedir } from 'node:os'
@@ -28,6 +29,7 @@ export interface DoctorDependencies {
   home?: string
   installDir?: string
   codexDir?: string
+  geminiDir?: string
   configPath?: string
   platform?: NodeJS.Platform
   nodeVersion?: string
@@ -62,7 +64,7 @@ async function files(path: string): Promise<string[]> {
   catch { return [] }
 }
 function check(id: string, label: string, status: DoctorStatus, detail: string, remediation?: string): DoctorCheck {
-  return { id, label, status, detail, remediation: status === 'pass' || status === 'skip' ? null : remediation || 'Run npx ccg-workflow to repair the installation.' }
+  return { id, label, status, detail, remediation: status === 'pass' || status === 'skip' ? null : remediation || `Run ${FORK_UPDATE_COMMAND} to repair the installation.` }
 }
 function executeVersion(file: string, args: string[]): string | null {
   try {
@@ -84,15 +86,15 @@ function versionDetail(raw: string): string {
 async function readConfiguration(path: string): Promise<{ config: RecordValue, result: DoctorCheck }> {
   const text = await readText(path)
   if (text === null) {
-    return { config: {}, result: check('config', 'CCG config', 'warn', 'Not found or unreadable', 'Run npx ccg-workflow to configure model routing.') }
+    return { config: {}, result: check('config', 'CCG config', 'warn', 'Not found or unreadable', `Run ${FORK_UPDATE_COMMAND} to configure model routing.`) }
   }
   try {
     const config = record(parse(text))
     const configured = Object.keys(record(config.routing)).length > 0
-    return { config, result: check('config', 'CCG config', configured ? 'pass' : 'fail', configured ? 'Readable TOML with model routing' : 'Missing model routing', 'Reconfigure model routing with npx ccg-workflow.') }
+    return { config, result: check('config', 'CCG config', configured ? 'pass' : 'fail', configured ? 'Readable TOML with model routing' : 'Missing model routing', `Reconfigure model routing with ${FORK_UPDATE_COMMAND}.`) }
   }
   catch {
-    return { config: {}, result: check('config', 'CCG config', 'fail', 'Invalid TOML', 'Repair config.toml syntax or run npx ccg-workflow to reconfigure.') }
+    return { config: {}, result: check('config', 'CCG config', 'fail', 'Invalid TOML', `Repair config.toml syntax or run ${FORK_UPDATE_COMMAND} to reconfigure.`) }
   }
 }
 
@@ -115,7 +117,7 @@ function selectedBackends(config: RecordValue): { names: string[], invalid: bool
 
 async function modeChecks(installDir: string, codexDir: string, hasNativeSkills: boolean) {
   const commandFiles = (await files(join(installDir, 'commands', 'osm'))).filter(f => f.endsWith('.md'))
-  const claude = commandFiles.length > 0 || await fs.pathExists(join(installDir, 'commands', 'ccg.md'))
+  const claude = commandFiles.length > 0
   const marker = await readText(join(codexDir, '.ccg-version'))
   const agents = await readText(join(codexDir, 'AGENTS.md'))
   const codex = /^\d+\.\d+\.\d+(?:-[\w.-]+)?$/.test(marker?.trim() || '') || !!agents?.includes('<!-- CCG:START')
@@ -144,21 +146,9 @@ function references(command: string, path: string): boolean {
   return (!before || /[\s"']/.test(before)) && (!after || /[\s"']/.test(after))
 }
 
-async function claudeChecks(installDir: string, commandFiles: string[]): Promise<DoctorCheck[]> {
-  // Slim fork ships no per-turn hooks; leftovers from a full install only add injected context.
-  const leftoverHooks = await fs.pathExists(join(installDir, 'hooks', 'ccg'))
-  let registered = 0
-  try {
-    const json = record(JSON.parse(await readText(join(installDir, 'settings.json')) || '{}'))
-    for (const event of Object.keys(record(json.hooks)))
-      registered += registeredCommands(json, event).filter(cmd => /hooks[\\/]ccg[\\/]/.test(normalized(cmd))).length
-  }
-  catch { /* Report broken registration without echoing settings or errors. */ }
-  const rules = (await files(join(installDir, 'rules'))).filter(f => f.startsWith('ccg-') && f.endsWith('.md'))
+async function claudeChecks(commandFiles: string[]): Promise<DoctorCheck[]> {
   return [
     check('claude.commands', 'Commands', commandFiles.length > 0 ? 'pass' : 'fail', `${commandFiles.length} workflow commands`),
-    check('claude.hooks', 'Hooks', !leftoverHooks && registered === 0 ? 'pass' : 'warn', leftoverHooks || registered ? `legacy CCG hooks present (${registered} registered); run ccg init to remove` : 'no per-turn hooks'),
-    check('claude.rules', 'Rules', 'pass', `${rules.length} CCG rules installed`),
   ]
 }
 
@@ -185,14 +175,14 @@ async function codexChecks(codexDir: string, managedAgents: boolean): Promise<Do
   ]
 }
 
-async function standaloneDelegationChecks(installDir: string, codexDir: string, home: string, platform: NodeJS.Platform, exec: NonNullable<DoctorDependencies['exec']>): Promise<DoctorCheck[]> {
+async function standaloneDelegationChecks(installDir: string, codexDir: string, home: string, geminiDir: string, platform: NodeJS.Platform, exec: NonNullable<DoctorDependencies['exec']>): Promise<DoctorCheck[]> {
   const wrapper = join(installDir, 'bin', platform === 'win32' ? 'codeagent-wrapper.exe' : 'codeagent-wrapper')
   const raw = await fs.pathExists(wrapper) ? exec(wrapper, ['--version']) : null
   const agents = await readText(join(codexDir, 'AGENTS.md')) || ''
   const names = [...new Set([...agents.matchAll(/--backend ([a-z][a-z0-9-]*)\b/g)].map(match => match[1]))].filter(name => Object.hasOwn(BACKENDS, name))
   const promptFiles = names.flatMap(name => ['analyzer', 'reviewer'].map(role => join(installDir, '.ccg', 'prompts', name, `${role}.md`)))
   const hasPrompts = promptFiles.length > 0 && (await Promise.all(promptFiles.map(path => fs.pathExists(path)))).every(Boolean)
-  const drivers = await backendChecks(names.filter(name => name !== 'codex'), false, home, platform, exec)
+  const drivers = await backendChecks(names.filter(name => name !== 'codex'), false, home, geminiDir, platform, exec)
   return [
     check('binary.wrapper', 'External delegation', raw ? 'pass' : 'warn', raw ? versionDetail(raw) : 'Wrapper not installed; M+ external model delegation is unavailable', 'Run ccg init to install the external model delegation toolchain.'),
     check('codex.role-prompts', 'Delegation prompts', hasPrompts ? 'pass' : 'warn', hasPrompts ? 'External role prompts found' : 'Role prompts not installed; external model delegation is incomplete', 'Run ccg init to install role prompts and configure external model CLIs.'),
@@ -200,7 +190,7 @@ async function standaloneDelegationChecks(installDir: string, codexDir: string, 
   ]
 }
 
-async function backendChecks(names: string[], pureClaude: boolean, home: string, platform: NodeJS.Platform, exec: NonNullable<DoctorDependencies['exec']>) {
+async function backendChecks(names: string[], pureClaude: boolean, home: string, geminiDir: string, platform: NodeJS.Platform, exec: NonNullable<DoctorDependencies['exec']>) {
   if (pureClaude) return [check('routing.pure-claude', 'Pure Claude Code', 'pass', 'Agent Teams mode; no external model CLI required')]
   const checks: DoctorCheck[] = []
   for (const name of names) {
@@ -216,6 +206,22 @@ async function backendChecks(names: string[], pureClaude: boolean, home: string,
       if (await fs.pathExists(fallback)) output = exec(fallback, ['--version'])
     }
     checks.push(check(`cli.${name}`, spec.label, output ? 'pass' : 'fail', output ? versionDetail(output) : 'Not found or --version failed', `Install ${spec.label} and ensure ${spec.commands[0]} is on PATH, then run ccg doctor.`))
+  }
+  if (names.includes('antigravity')) {
+    let allowed = false
+    try {
+      const settings = record(JSON.parse(await readText(join(geminiDir, 'antigravity-cli', 'settings.json')) || '{}'))
+      const rules = record(settings.permissions).allow
+      allowed = Array.isArray(rules) && rules.includes('command(*)')
+    }
+    catch {}
+    checks.push(check(
+      'antigravity.permissions',
+      'Antigravity shell',
+      allowed ? 'pass' : 'warn',
+      allowed ? 'Headless shell permission rule found' : 'Headless shell permission rule missing or settings unreadable',
+      'Allow agy shell tools in headless mode: add "command(*)" to permissions.allow in ~/.gemini/antigravity-cli/settings.json (ask the user first).',
+    ))
   }
   return checks
 }
@@ -241,6 +247,16 @@ function nativeSkillPaths(home: string, installDir: string, target: 'claude' | '
   return { nativeDir: join(root, 'skills'), storeDir: join(root, '.ccg-skills'), ...deps.skillPaths?.[target], target }
 }
 
+async function hasBundledSkill(directory: string): Promise<boolean> {
+  const entries = await fs.readdir(directory, { withFileTypes: true }).catch(() => [])
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue
+    const child = join(directory, entry.name)
+    if ((await files(child)).includes('SKILL.md') || await hasBundledSkill(child)) return true
+  }
+  return false
+}
+
 async function skillChecks(home: string, installDir: string, mode: DoctorReport['mode'], deps: DoctorDependencies): Promise<DoctorCheck[]> {
   const candidates: ('claude' | 'codex')[] = mode === 'both' || mode === 'skills' ? ['claude', 'codex'] : mode === 'none' ? [] : [mode]
   const targets: ('claude' | 'codex')[] = []
@@ -252,8 +268,8 @@ async function skillChecks(home: string, installDir: string, mode: DoctorReport[
     const paths = nativeSkillPaths(home, installDir, target, deps)
     const id = `${target}.skills`
     if (!await fs.pathExists(join(paths.storeDir, SKILL_MANIFEST_FILE))) {
-      const legacy = await fs.pathExists(join(installDir, 'skills', 'ccg', 'SKILL.md'))
-      return check(id, `${target === 'claude' ? 'Claude' : 'Codex'} skills`, 'warn', legacy ? 'Legacy bundled skills found; native selection not configured' : 'No managed native skill selection', `Run ccg skills list --target ${target} to select native skills.`)
+      const legacy = target === 'claude' && await hasBundledSkill(join(installDir, 'skills', 'ccg'))
+      return check(id, `${target === 'claude' ? 'Claude' : 'Codex'} skills`, legacy ? 'pass' : 'warn', legacy ? 'Legacy bundled skills found' : 'No managed native skill selection', `Run ccg skills list --target ${target} to select native skills.`)
     }
     try {
       const entries = (await listSkills(paths)).filter(entry => entry.installed)
@@ -270,6 +286,7 @@ export async function collectDoctorReport(deps: DoctorDependencies = {}): Promis
   const home = deps.home || homedir()
   const installDir = deps.installDir || join(home, '.claude')
   const codexDir = deps.codexDir || join(home, '.codex')
+  const geminiDir = deps.geminiDir || join(home, '.gemini')
   const configPath = deps.configPath || join(installDir, '.ccg', 'config.toml')
   const platform = deps.platform || process.platform
   const exec = deps.exec || executeVersion
@@ -291,16 +308,16 @@ export async function collectDoctorReport(deps: DoctorDependencies = {}): Promis
     result,
     check('installation.mode', 'Installation', mode === 'none' ? 'fail' : 'pass', mode === 'none' ? 'No CCG managed installation found' : `CCG ${mode} mode`),
   ]
-  if (workflowInstalled && Object.keys(config).length > 0) checks.push(check('routing.backends', 'Model routing', invalid ? 'fail' : 'pass', invalid ? 'Invalid or unsupported backend routing' : names.join(', '), 'Reconfigure frontend, backend and review routing with npx ccg-workflow.'))
-  if (mode === 'claude' || mode === 'both') checks.push(...await claudeChecks(installDir, commandFiles))
+  if (workflowInstalled && Object.keys(config).length > 0) checks.push(check('routing.backends', 'Model routing', invalid ? 'fail' : 'pass', invalid ? 'Invalid or unsupported backend routing' : names.join(', '), `Reconfigure frontend, backend and review routing with ${FORK_UPDATE_COMMAND}.`))
+  if (mode === 'claude' || mode === 'both') checks.push(...await claudeChecks(commandFiles))
   if (mode === 'codex' || mode === 'both') checks.push(...await codexChecks(codexDir, managedAgents))
-  if (mode === 'codex') checks.push(...await standaloneDelegationChecks(installDir, codexDir, home, platform, exec))
+  if (mode === 'codex') checks.push(...await standaloneDelegationChecks(installDir, codexDir, home, geminiDir, platform, exec))
   if (!pureClaude && workflowInstalled) {
     const wrapper = join(installDir, 'bin', platform === 'win32' ? 'codeagent-wrapper.exe' : 'codeagent-wrapper')
     const raw = await fs.pathExists(wrapper) ? exec(wrapper, ['--version']) : null
     checks.push(check('binary.wrapper', 'Binary', raw ? 'pass' : 'fail', raw ? versionDetail(raw) : 'codeagent-wrapper not found or --version failed'))
   }
-  checks.push(...await backendChecks(names, pureClaude, home, platform, exec))
+  checks.push(...await backendChecks(names, pureClaude, home, geminiDir, platform, exec))
   checks.push(...await skillChecks(home, installDir, mode, deps))
   checks.push(await mcpCheck(home, codexDir, mode))
   return { schemaVersion: 1, version, mode, backends: names, checks, failureCount: checks.filter(c => c.status === 'fail').length, warningCount: checks.filter(c => c.status === 'warn').length }

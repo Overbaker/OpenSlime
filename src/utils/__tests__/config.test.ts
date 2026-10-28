@@ -66,16 +66,6 @@ describe('createDefaultConfig', () => {
     expect(config.mcp.provider).toBe('contextweaver')
   })
 
-  it('defaults liteMode to false', () => {
-    const config = createDefaultConfig(baseOptions)
-    expect(config.performance?.liteMode).toBe(false)
-  })
-
-  it('respects liteMode = true', () => {
-    const config = createDefaultConfig({ ...baseOptions, liteMode: true })
-    expect(config.performance?.liteMode).toBe(true)
-  })
-
   it('sets paths with home directory', () => {
     const config = createDefaultConfig(baseOptions)
     expect(config.paths.commands).toContain('.claude')

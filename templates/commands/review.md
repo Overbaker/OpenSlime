@@ -4,7 +4,7 @@ description: 'codex + antigravity 独立会话交叉审查 → Critical 必须�
 <!-- CCG:SPEC:REVIEW:START -->
 **Core Philosophy**
 - Dual-model cross-validation catches blind spots single-model review would miss.
-- Critical findings SHOULD be addressed before proceeding.
+- Critical findings MUST be addressed before proceeding.
 - Review validates implementation against spec constraints and code quality.
 - This is an independent review tool—can be used anytime, not tied to archive workflow.
 
@@ -91,13 +91,13 @@ description: 'codex + antigravity 独立会话交叉审查 → Critical 必须�
      * Do NOT allow archiving.
 
    - **If Critical = 0**:
-     * Ask user: "All critical checks passed. Proceed to archive?"
+     * Report that review passed; return to `/osm:impl` Step 8 for archiving. Only that step owns archive.
      * If Warning > 0, recommend addressing before archive.
 
 7. **Optional: Inline Fix Mode**
    - If user chooses "Fix now" for Critical issues:
      * Route each fix to appropriate model (backend→{{BACKEND_PRIMARY}}, frontend→{{FRONTEND_PRIMARY}}).
-     * Apply fix using unified diff patch pattern.
+     * Apply the Fix Rules from /osm:impl (writer via resume; Claude only mechanical ≤5-line fixes).
      * Re-run affected review dimension.
      * Repeat until Critical = 0.
 
@@ -106,13 +106,13 @@ description: 'codex + antigravity 独立会话交叉审查 → Critical 必须�
 Review is complete when:
 - [ ] Required reviews completed
 - [ ] All findings synthesized and classified
-- [ ] Zero Critical issues remain (fixed or user-acknowledged)
+- [ ] Zero Critical issues remain (fixed and re-reviewed, or explicitly accepted by the user)
 - [ ] User decision captured (archive / return to impl / defer)
 
 **Reference**
 - View proposal: `openspec status --change "<id>" --json`
 - Check spec constraints: `rg -n "CONSTRAINT:|MUST|INVARIANT:" openspec/changes/<id>/specs/`
 - View implementation diff: `git diff`
-- Archive (after passing): `/osm:impl` → Step 10
+- Archive (after passing): `/osm:impl` → Step 8
 **Stage report**: before finishing, write the `review` report as specified in `~/.claude/.ccg/prompts/claude/osm-report.md` (read it then; temporary file, includes a confidence estimate).
 <!-- CCG:SPEC:REVIEW:END -->

@@ -37,8 +37,6 @@ export {
 } from './utils/migration'
 export {
   getCurrentVersion,
-  getLatestVersion,
-  checkForUpdates,
   compareVersions,
 } from './utils/version'
 

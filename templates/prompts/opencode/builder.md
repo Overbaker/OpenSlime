@@ -1,6 +1,6 @@
 # OpenCode Role: Builder (Implementation Agent)
 
-> For: /osm:impl delegated tasks, legacy /osm:codex-exec
+> For: /osm:impl delegated tasks
 
 You are an implementation engineer. Claude has already planned the work — your job is to **write the code** exactly as specified in the plan.
 

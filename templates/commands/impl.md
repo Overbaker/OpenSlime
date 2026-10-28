@@ -64,9 +64,9 @@ description: 'codex/antigravity 按任务写代码，Claude 监控审查 + 归�
 
    **Optional comparison writer** (only when `$ARGUMENTS` contains `--compare` or the user asks; doubles writing cost):
    - In the same message as the writer call, spawn one subagent: `Agent({ subagent_type: "general-purpose", isolation: "worktree", run_in_background: true, prompt })`. Main Claude and the main writer never load its skills or see its draft until review.
-   - Its prompt: same TASK, FILES and VERIFY. It decides on its own, in one line each: who writes (itself, or {{FRONTEND_PRIMARY}} via `~/.claude/bin/codeagent-wrapper --backend {{FRONTEND_PRIMARY}}` inside its worktree) and which installed skill, if any, to load for this task. Then it writes, runs VERIFY, and reports: choice + reason, diff summary, VERIFY output. It must not touch the main working tree.
+   - Its prompt: same TASK, FILES and VERIFY. It decides on its own, in one line each: who writes (itself, or {{FRONTEND_PRIMARY}} via `~/.claude/bin/codeagent-wrapper --backend {{FRONTEND_PRIMARY}}` inside its worktree) and which installed skill, if any, to load for this task. Then it writes, runs VERIFY, and reports: choice + reason, absolute worktree path, base commit (`git rev-parse HEAD` before writing), diff summary, VERIFY output. It must not touch the main working tree.
    - The worktree starts from `HEAD`: skip comparison for a task that depends on uncommitted earlier tasks.
-   - Both diffs go to the cross review (Step 6). Keep the one that passes VERIFY with fewer Critical findings; on a tie keep the smaller diff. Only the kept result lands in the main tree.
+   - Record the comparison worktree path and base commit from its report. Both diffs go to the cross review (Step 6). Keep the one that passes VERIFY with fewer Critical findings; on a tie keep the smaller diff. Only the kept result lands in the main tree.
 
 5. **Review the Diff**
    - `git diff` the task's files. Revert edits outside the allowed list.
@@ -76,12 +76,14 @@ description: 'codex/antigravity 按任务写代码，Claude 监控审查 + 归�
 6. **Independent Review**
    - Always run both {{BACKEND_PRIMARY}} and {{FRONTEND_PRIMARY}}, launched in ONE message with `run_in_background: true`. They answer independently; Claude cross-checks where they agree and disagree.
 
+   - With `--compare`, wait for both writers, then substitute the recorded absolute comparison worktree path and base commit into BOTH reviewer prompts below. Both reviewers must inspect both candidates before selection; without comparison, omit the comparison candidate instructions.
+
    **Step 6.1**: Launch the calls below in ONE message:
 
    **FIRST Bash call ({{BACKEND_PRIMARY}})**:
    ```
    Bash({
-     command: "~/.claude/bin/codeagent-wrapper --progress --backend {{BACKEND_PRIMARY}} {{GEMINI_MODEL_FLAG}}{{GROK_MODEL_FLAG}}{{KIMI_MODEL_FLAG}}{{OPENCODE_MODEL_FLAG}}- \"{{WORKDIR}}\" <<'EOF'\nROLE_FILE: ~/.claude/.ccg/prompts/{{BACKEND_PRIMARY}}/reviewer.md\nReview the uncommitted changes for <task> against the spec constraints. Read callers of every changed function, not only the diff.\nOUTPUT: JSON with findings\nEOF",
+     command: "~/.claude/bin/codeagent-wrapper --progress --backend {{BACKEND_PRIMARY}} {{GEMINI_MODEL_FLAG}}{{GROK_MODEL_FLAG}}{{KIMI_MODEL_FLAG}}{{OPENCODE_MODEL_FLAG}}- \"{{WORKDIR}}\" <<'EOF'\nROLE_FILE: ~/.claude/.ccg/prompts/{{BACKEND_PRIMARY}}/reviewer.md\nReview the uncommitted changes for <task> against the spec constraints. Read callers of every changed function, not only the diff.\nMain candidate: {{WORKDIR}}; inspect `git -C \"{{WORKDIR}}\" diff` and its changed files. With --compare, also inspect comparison candidate at <worktree>, base commit <base>: `git -C \"<worktree>\" diff <base>` and its changed files. Report findings separately for each candidate, including candidate name on every finding.\nOUTPUT: JSON with findings per candidate\nEOF",
      run_in_background: true,
      timeout: 300000,
      description: "{{BACKEND_PRIMARY}}: correctness/security review"
@@ -91,7 +93,7 @@ description: 'codex/antigravity 按任务写代码，Claude 监控审查 + 归�
    **SECOND Bash call ({{FRONTEND_PRIMARY}}) — same message**:
    ```
    Bash({
-     command: "~/.claude/bin/codeagent-wrapper --progress --backend {{FRONTEND_PRIMARY}} {{GEMINI_MODEL_FLAG}}{{GROK_MODEL_FLAG}}{{KIMI_MODEL_FLAG}}{{OPENCODE_MODEL_FLAG}}- \"{{WORKDIR}}\" <<'EOF'\nROLE_FILE: ~/.claude/.ccg/prompts/{{FRONTEND_PRIMARY}}/reviewer.md\nIndependently review the uncommitted changes for <task>: logic, integration and security; UI states and accessibility if UI code changed.\nOUTPUT: JSON with findings\nEOF",
+     command: "~/.claude/bin/codeagent-wrapper --progress --backend {{FRONTEND_PRIMARY}} {{GEMINI_MODEL_FLAG}}{{GROK_MODEL_FLAG}}{{KIMI_MODEL_FLAG}}{{OPENCODE_MODEL_FLAG}}- \"{{WORKDIR}}\" <<'EOF'\nROLE_FILE: ~/.claude/.ccg/prompts/{{FRONTEND_PRIMARY}}/reviewer.md\nIndependently review the uncommitted changes for <task>: logic, integration and security; UI states and accessibility if UI code changed.\nMain candidate: {{WORKDIR}}; inspect `git -C \"{{WORKDIR}}\" diff` and its changed files. With --compare, also inspect comparison candidate at <worktree>, base commit <base>: `git -C \"<worktree>\" diff <base>` and its changed files. Report findings separately for each candidate, including candidate name on every finding.\nOUTPUT: JSON with findings per candidate\nEOF",
      run_in_background: true,
      timeout: 300000,
      description: "{{FRONTEND_PRIMARY}}: maintainability/patterns review"
@@ -104,6 +106,7 @@ description: 'codex/antigravity 按任务写代码，Claude 监控审查 + 归�
    - 某个模型失败：重试一次；仍失败就用另一方的结果继续，并在阶段报告里把置信度下调一档。
 
    - Use a fresh session (no `resume`): the writer reviewing its own work misses the same things twice.
+   - With `--compare`, cross-check both reviewers' findings per candidate, then pick the candidate that passes VERIFY with fewer Critical findings (smaller diff on a tie). Only then bring the kept result into the main tree.
    - Handle Critical and Warning findings with the Fix Rules, then review the changed files again in a fresh session. Stop after 3 rounds and report to the user.
 
 7. **Update Task Status**
@@ -112,7 +115,7 @@ description: 'codex/antigravity 按任务写代码，Claude 监控审查 + 归�
 
 
 8. **Archive on Completion**
-    - When ALL tasks in `tasks.md` are marked `[x]`:
+    - This step is the sole archive owner. Archive only when ALL tasks in `tasks.md` are marked `[x]` and `/osm:review` has passed with Critical = 0. If review has not passed, run `/osm:review` first and address its findings before archiving.
     - Call `/opsx:archive` internally to archive the change:
       ```
       /opsx:archive

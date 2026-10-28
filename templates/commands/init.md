@@ -58,7 +58,12 @@ description: '初始化 OpenSpec (OPSX) 环境 + 验证多模型 MCP 工具'
      - Check `.claude/commands/opsx/` contains OPSX commands
    - Report any errors with remediation steps.
 
-4. **Validate Multi-Model MCP Tools**
+4. **Check Antigravity Shell Permissions**
+   - If `antigravity` is a selected backend ({{BACKEND_PRIMARY}} or {{FRONTEND_PRIMARY}}), read `~/.gemini/antigravity-cli/settings.json` and verify that `permissions.allow` contains the entry `"command(*)"` (narrower `command(...)` rules are not enough). Skip this check when Antigravity is not selected.
+   - If the file or matching entry is missing, explain that headless agy otherwise denies shell tools and returns nothing. Ask whether the user agrees to add `command(*)`, which allows all shell commands.
+   - Only after the user agrees, add `command(*)` to `permissions.allow`, creating the file or array if missing and preserving all existing settings and entries. If the user declines, leave settings unchanged and report Antigravity as not ready. If the file is invalid JSON, report the error without overwriting it.
+
+5. **Validate Multi-Model MCP Tools**
    - Check `codeagent-wrapper` availability: `~/.claude/bin/codeagent-wrapper --version`
    - **工作目录**：`{{WORKDIR}}` **必须通过 Bash 执行 `pwd`（Unix）或 `cd`（Windows CMD）获取当前工作目录的绝对路径**，禁止从 `$HOME` 或环境变量推断。如果用户通过 `/add-dir` 添加了多个工作区，先确定任务相关的工作区。
    - Test {{BACKEND_PRIMARY}} backend:
@@ -71,7 +76,7 @@ description: '初始化 OpenSpec (OPSX) 环境 + 验证多模型 MCP 工具'
      ```
    - For each unavailable tool, display warning with installation instructions.
 
-5. **Summary Report**
+6. **Summary Report**
    Display status table:
    ```
    Component                 Status
@@ -87,7 +92,7 @@ description: '初始化 OpenSpec (OPSX) 环境 + 验证多模型 MCP 工具'
    **Next Steps (Use /osm:* Commands)**
    1. Start Research: `/osm:research "description"`
    2. Plan & Design: `/osm:plan`
-   3. Implement: `/osm:impl` (Includes auto-review & archive)
+   3. Implement: `/osm:impl` (Includes independent review; Step 8 archives only after `/osm:review` passes with Critical = 0)
 
    **Standalone Tools (Available Anytime)**
    - Code Review: `/osm:review` (Independent dual-model review)

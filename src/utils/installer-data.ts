@@ -47,25 +47,15 @@ const CORE_CONFIGS: WorkflowConfig[] = [
   cmd('review', 34, 'spec', '归档前审查', 'Review', '独立会话审查 → Critical 必须修复 → 允许归档', 'Independent-session review before archiving'),
 ]
 
-// ═══════════════════════════════════════════════════════
-// Legacy commands: removed in OpenSlime (non-OpenSpec workflows)
-// ═══════════════════════════════════════════════════════
-
-const LEGACY_CONFIGS: WorkflowConfig[] = []
-
-// Combined for backward compatibility
-const WORKFLOW_CONFIGS: WorkflowConfig[] = [...CORE_CONFIGS, ...LEGACY_CONFIGS]
-
-// ═══════════════════════════════════════════════════════
 // Public API
 // ═══════════════════════════════════════════════════════
 
 export function getWorkflowConfigs(): WorkflowConfig[] {
-  return WORKFLOW_CONFIGS.sort((a, b) => a.order - b.order)
+  return CORE_CONFIGS.sort((a, b) => a.order - b.order)
 }
 
 export function getWorkflowById(id: string): WorkflowConfig | undefined {
-  return WORKFLOW_CONFIGS.find(w => w.id === id)
+  return CORE_CONFIGS.find(w => w.id === id)
 }
 
 /** V3 core command IDs (always installed) */
@@ -73,14 +63,9 @@ export function getCoreCommandIds(): string[] {
   return CORE_CONFIGS.map(w => w.id)
 }
 
-/** Legacy command IDs (optional install) */
-export function getLegacyCommandIds(): string[] {
-  return LEGACY_CONFIGS.map(w => w.id)
-}
-
-/** All command IDs (core + legacy) */
+/** All command IDs */
 export function getAllCommandIds(): string[] {
-  return WORKFLOW_CONFIGS.map(w => w.id)
+  return CORE_CONFIGS.map(w => w.id)
 }
 
 /**
@@ -90,9 +75,9 @@ export const WORKFLOW_PRESETS = {
   full: {
     name: '完整',
     nameEn: 'Full',
-    description: `全部命令（${WORKFLOW_CONFIGS.length}个）`,
-    descriptionEn: `All commands (${WORKFLOW_CONFIGS.length})`,
-    workflows: WORKFLOW_CONFIGS.map(w => w.id),
+    description: `全部命令（${CORE_CONFIGS.length}个）`,
+    descriptionEn: `All commands (${CORE_CONFIGS.length})`,
+    workflows: CORE_CONFIGS.map(w => w.id),
   },
 }
 

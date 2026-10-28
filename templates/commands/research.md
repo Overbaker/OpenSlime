@@ -9,19 +9,16 @@ description: '需求 → 约束集（codex + antigravity 交叉探索 + OpenSpec
 - Strictly adhere to OPSX rules when writing spec-structured documents.
 
 **Guardrails**
-- **NEVER** divide subagent tasks by roles (e.g., "架构师agent", "安全专家agent").
-- **ALWAYS** divide by context boundaries (e.g., "user-related code", "authentication logic").
-- Each subagent context must be self-contained with independent output.
 - Use `{{MCP_SEARCH_TOOL}}` to minimize grep/find operations.
 - Do not make architectural decisions—surface constraints that guide decisions.
 - **USER GUIDANCE RULE**: When suggesting next steps to the user, ALWAYS use OSM commands (`/osm:research`, `/osm:plan`, `/osm:impl`, `/osm:review`). NEVER suggest `/opsx:*` commands to the user. If OpenSpec CLI returns error messages referencing OPSX skills, translate them to `/osm:*` equivalents.
 - **PHASE BOUNDARY**: This phase ONLY generates the OPSX proposal artifact. Do NOT modify any source code. Do NOT proceed to planning or implementation. After the proposal is generated, STOP and inform the user: "Research complete. Run `/osm:plan` to continue."
 
 **Steps**
-0. **Clarify the Requirement**
+1. **Clarify the Requirement**
    - Restate $ARGUMENTS as goal, scope, constraints and acceptance criteria in a few lines. Ask only about gaps that change the outcome.
 
-1. **Generate OPSX Change**
+2. **Generate OPSX Change**
    - Check if change already exists:
      ```bash
      openspec list --json
@@ -33,17 +30,9 @@ description: '需求 → 约束集（codex + antigravity 交叉探索 + OpenSpec
    - This scaffolds `openspec/changes/<name>/` with proposal.md.
    - If change already exists, continue with existing change.
 
-2. **Initial Codebase Assessment**
+3. **Initial Codebase Assessment**
    - Use `{{MCP_SEARCH_TOOL}}` to scan codebase.
    - Determine project scale: single vs multi-directory structure.
-   - **Decision**: If multi-directory → enable parallel Explore subagents.
-
-3. **Define Exploration Boundaries (Context-Based)**
-   - Identify natural context boundaries (NOT functional roles):
-     * Subagent 1: User domain code (models, services, UI)
-     * Subagent 2: Auth & authorization (middleware, session, tokens)
-     * Subagent 3: Infrastructure (configs, deployments, builds)
-   - Each boundary should be self-contained: no cross-communication needed.
 
 4. **Parallel Multi-Model Exploration**
    - Always run both {{BACKEND_PRIMARY}} and {{FRONTEND_PRIMARY}}, launched in ONE message with `run_in_background: true`. They answer independently; Claude cross-checks where they agree and disagree.
@@ -91,7 +80,7 @@ description: '需求 → 约束集（codex + antigravity 交叉探索 + OpenSpec
    - 某个模型失败：重试一次；仍失败就用另一方的结果继续，并在阶段报告里把置信度下调一档。
 
 5. **Aggregate and Synthesize**
-   - Collect all subagent outputs.
+   - Collect both model outputs.
    - Merge into unified constraint sets:
      * **Hard constraints**: Technical limitations, patterns that cannot be violated
      * **Soft constraints**: Conventions, preferences, style guides

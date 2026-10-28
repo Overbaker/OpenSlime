@@ -1,9 +1,10 @@
+import { FORK_UPDATE_COMMAND } from './fork-update'
 import type { InstallResult } from '../types'
 import { homedir } from 'node:os'
 import ansis from 'ansis'
 import fs from 'fs-extra'
 import { basename, join } from 'pathe'
-import { getLegacyCommandIds, getWorkflowById } from './installer-data'
+import { getWorkflowById } from './installer-data'
 import { configureAllSponsorsForCodex, removeAllSponsorsFromCodex } from './installer-codex-api'
 import { PACKAGE_ROOT, injectConfigVariables, replaceHomePathsInTemplate } from './installer-template'
 import { readCcgConfig } from './config'
@@ -19,7 +20,6 @@ import { version as packageVersion } from '../../package.json'
 export {
   getAllCommandIds,
   getCoreCommandIds,
-  getLegacyCommandIds,
   getWorkflowById,
   getWorkflowConfigs,
   getWorkflowPreset,
@@ -108,9 +108,7 @@ interface InstallConfig {
     kimiModel?: string
     opencodeModel?: string
   }
-  liteMode: boolean
   mcpProvider: string
-  skipImpeccable?: boolean
   skillsProfile?: string[]
   skillsMode?: 'legacy' | 'native'
 }
@@ -254,7 +252,6 @@ async function copyMdTemplates(
  */
 async function installCommandFiles(ctx: InstallContext, workflowIds: string[]): Promise<void> {
   const commandsDir = join(ctx.installDir, 'commands', 'osm')
-  const legacyIds = new Set(getLegacyCommandIds())
 
   for (const workflowId of workflowIds) {
     const workflow = getWorkflowById(workflowId)
@@ -264,9 +261,7 @@ async function installCommandFiles(ctx: InstallContext, workflowIds: string[]): 
     }
 
     for (const cmd of workflow.commands) {
-      // Route to correct source directory: core → commands/, legacy → commands-legacy/
-      const srcSubdir = legacyIds.has(workflowId) ? 'commands-legacy' : 'commands'
-      const srcFile = join(ctx.templateDir, srcSubdir, `${cmd}.md`)
+      const srcFile = join(ctx.templateDir, 'commands', `${cmd}.md`)
       const destFile = join(commandsDir, `${cmd}.md`)
 
       try {
@@ -502,17 +497,11 @@ async function installSkillGeneratedCommands(ctx: InstallContext): Promise<void>
       }
     }
 
-    const skipCategories: import('./skill-registry').SkillCategory[] = []
-    if (ctx.config.skipImpeccable) {
-      skipCategories.push('impeccable')
-    }
-
     const generated = await installSkillCommands(
       skillsTemplateDir,
       skillsInstallDir,
       commandsDir,
       existingCommandNames,
-      skipCategories,
     )
 
     if (generated.length > 0) {
@@ -548,7 +537,6 @@ export async function installCodexMode(): Promise<{ success: boolean, message: s
     const config = await readCcgConfig()
     const injectOpts = {
       routing: config?.routing as any,
-      liteMode: config?.performance?.liteMode || false,
       mcpProvider: config?.mcp?.provider || 'skip',
     }
 
@@ -837,7 +825,7 @@ export function showBinaryDownloadWarning(binDir: string): void {
     console.log()
   }
   console.log(ansis.white(`    或重新安装 / Or re-install:`))
-  console.log(ansis.cyan(`       npx ccg-workflow@latest`))
+  console.log(ansis.cyan(`       ${FORK_UPDATE_COMMAND}`))
   console.log()
 }
 
@@ -921,6 +909,10 @@ const SLIMMED_ARTIFACTS = [
   'agents/ccg',
   'rules/ccg-skills.md',
   'rules/ccg-skill-routing.md',
+  'skills/tools',
+  'skills/orchestration',
+  'skills/SKILL.md',
+  'skills/run_skill.js',
   'skills/ccg/SKILL.md',
   'skills/ccg/run_skill.js',
   'skills/ccg/tools',
@@ -958,7 +950,14 @@ async function removeSlimmedArtifacts(ctx: InstallContext): Promise<void> {
 async function deregisterCcgHooks(installDir: string): Promise<boolean> {
   const settingsPath = join(installDir, 'settings.json')
   if (!(await fs.pathExists(settingsPath))) return false
-  const settings = JSON.parse(await fs.readFile(settingsPath, 'utf-8')) as Record<string, any>
+  let settings: Record<string, any>
+  try {
+    settings = JSON.parse(await fs.readFile(settingsPath, 'utf-8'))
+  }
+  catch {
+    console.warn('Warning: settings.json could not be parsed; hook deregistration skipped and file preserved.')
+    return false
+  }
   const hooks = settings.hooks as Record<string, any[]> | undefined
   if (!hooks || typeof hooks !== 'object') return false
   const isCcgHook = (hh: any): boolean => typeof hh?.command === 'string' && /hooks[\\/]ccg[\\/]/.test(hh.command)
@@ -1004,9 +1003,7 @@ export async function installWorkflows(
       kimiModel?: string
       opencodeModel?: string
     }
-    liteMode?: boolean
     mcpProvider?: string
-    skipImpeccable?: boolean
     skillsProfile?: string[]
     skillsMode?: 'legacy' | 'native'
   },
@@ -1021,9 +1018,7 @@ export async function installWorkflows(
         backend: { models: ['codex'], primary: 'codex' },
         review: { models: ['codex', 'antigravity'] },
       },
-      liteMode: config?.liteMode || false,
       mcpProvider: config?.mcpProvider || 'fast-context',
-      skipImpeccable: config?.skipImpeccable || false,
       skillsProfile: config?.skillsMode === 'legacy' ? undefined : config?.skillsProfile,
       skillsMode: config?.skillsMode,
     },
@@ -1044,7 +1039,7 @@ export async function installWorkflows(
   if (!(await fs.pathExists(ctx.templateDir))) {
     const errorMsg = `Template directory not found: ${ctx.templateDir} (PACKAGE_ROOT=${PACKAGE_ROOT}). `
       + `This usually means the npm package is incomplete or the cache is corrupted. `
-      + `Try: npm cache clean --force && npx ccg-workflow@latest`
+      + `Try: ${FORK_UPDATE_COMMAND}`
     ctx.result.errors.push(errorMsg)
     ctx.result.success = false
     return ctx.result

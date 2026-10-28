@@ -45,8 +45,6 @@ export function createDefaultConfig(options: {
   routing: ModelRouting
   installedWorkflows: string[]
   mcpProvider?: string
-  liteMode?: boolean
-  skipImpeccable?: boolean
   skillsProfile?: string[]
   skillsMode?: 'legacy' | 'native'
 }): CcgConfig {
@@ -70,8 +68,6 @@ export function createDefaultConfig(options: {
       setup_url: 'https://augmentcode.com/',
     },
     performance: {
-      liteMode: options.liteMode || false,
-      skipImpeccable: options.skipImpeccable || false,
       ...(options.skillsProfile !== undefined ? { skillsProfile: [...options.skillsProfile] } : {}),
       ...(options.skillsMode !== undefined ? { skillsMode: options.skillsMode } : {}),
     },

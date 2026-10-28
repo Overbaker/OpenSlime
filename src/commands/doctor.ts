@@ -1,3 +1,4 @@
+import { FORK_UPDATE_COMMAND } from '../utils/fork-update'
 import type { DoctorDependencies, DoctorReport } from '../utils/doctor-checks'
 import ansis from 'ansis'
 import fs from 'fs-extra'
@@ -48,7 +49,7 @@ export async function doctor(options: { json?: boolean } = {}, deps: DoctorDepen
     }
     output(report.failureCount === 0
       ? `\n  ${report.warningCount ? ansis.yellow(`No failures; ${report.warningCount} warning(s).`) : ansis.green('All checks passed.')}\n`
-      : `\n  ${ansis.red(`${report.failureCount} issue(s) found. Run npx ccg-workflow to repair.`)}\n`)
+      : `\n  ${ansis.red(`${report.failureCount} issue(s) found. Run ${FORK_UPDATE_COMMAND} to repair.`)}\n`)
   }
   const setExitCode = deps.setExitCode || ((code: number) => { process.exitCode = code })
   setExitCode(report.failureCount > 0 ? 1 : 0)
@@ -61,13 +62,9 @@ export async function status(): Promise<void> {
   // Version
   const config = await readCcgConfig()
   const installedVer = config?.general?.version || 'unknown'
-  const latestVer = execSafe('npm view ccg-workflow version') || 'unknown'
 
   // Commands
   const cmds = (await dirFiles(join(installDir, 'commands', 'osm'))).filter(f => f.endsWith('.md'))
-
-  // Hooks
-  const hooks = (await dirFiles(join(installDir, 'hooks', 'ccg'))).filter(f => f.endsWith('.js'))
 
   // Binary
   const wrapperName = process.platform === 'win32' ? 'codeagent-wrapper.exe' : 'codeagent-wrapper'
@@ -128,9 +125,8 @@ export async function status(): Promise<void> {
   console.log()
   console.log(ansis.cyan.bold('  CCG Status'))
   console.log()
-  console.log(`  ${ansis.bold('Version')}        ${installedVer}${installedVer !== latestVer ? ansis.yellow(` (latest: ${latestVer})`) : ansis.green(' (up to date)')}`)
+  console.log(`  ${ansis.bold('Version')}        ${installedVer}`)
   console.log(`  ${ansis.bold('Commands')}       ${cmds.length}`)
-  console.log(`  ${ansis.bold('Hooks')}          ${hooks.length} scripts`)
   console.log(`  ${ansis.bold('Binary')}         ${binaryVer}`)
   console.log(`  ${ansis.bold('Frontend')}       ${frontend}`)
   console.log(`  ${ansis.bold('Backend')}        ${backend}`)

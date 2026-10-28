@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { injectConfigVariables } from '../installer'
@@ -196,11 +196,7 @@ describe('integration: real templates with skip mode', () => {
     return files
   }
 
-  const legacyDir = join(PACKAGE_ROOT, 'templates', 'commands-legacy')
-  const templateFiles = [
-    ...collectTemplateFiles(TEMPLATES_DIR),
-    ...(existsSync(legacyDir) ? collectTemplateFiles(legacyDir) : []),
-  ]
+  const templateFiles = collectTemplateFiles(TEMPLATES_DIR)
   const filesWithMcpRef = templateFiles.filter((f) => {
     const content = readFileSync(f, 'utf-8')
     return content.includes('{{MCP_SEARCH_TOOL}}')

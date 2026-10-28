@@ -1,3 +1,6 @@
+import { mkdtemp, mkdir, writeFile, readFile, symlink, readlink, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'pathe'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { init } from '../../commands/init'
 import { createDefaultConfig, createDefaultRouting } from '../config'
@@ -11,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   prompt: vi.fn(),
   pathExists: vi.fn(),
   installedNames: vi.fn(),
+  removeSkills: vi.fn(),
   spinnerFailed: vi.fn(),
   spinnerSucceeded: vi.fn(),
   installMcp: vi.fn(),
@@ -57,6 +61,7 @@ vi.mock('../skill-manager', () => ({
   }),
   SKILL_MANIFEST_FILE: 'manifest.json',
   installedNames: mocks.installedNames,
+  removeSkills: mocks.removeSkills,
   getSkillCatalog: () => [
     { name: 'verify-change', description: 'Review changes' },
     { name: 'multi-agent', description: 'Coordinate agents' },
@@ -95,7 +100,7 @@ function answerInitQuestions(overrides: Record<string, any> = {}) {
       apiProvider: 'skip', wireGeminiCli: false,
       selectedFrontend: 'codex', selectedBackend: 'opencode',
       selectedOpencodeModel: questions[0].default,
-      perfMode: 'standard', versionMode: 'v3', skillsMode: 'legacy', action: 'confirm',
+      skillsMode: 'legacy', action: 'confirm',
       ...overrides,
     }
     if (!(name in answers))
@@ -153,6 +158,53 @@ describe('OpenCode configuration during init', () => {
     expect(mocks.installedNames).toHaveBeenCalledWith(expect.objectContaining({
       nativeDir: '/tmp/ccg-init-test/skills', storeDir: '/tmp/ccg-init-test/.ccg-skills',
     }))
+  })
+
+  it.each(['profile', 'manifest'])('filters retired names from a saved %s and removes managed aliases', async (source) => {
+    mocks.existing.performance.skillsProfile = ['verify-security', 'verify-change']
+    mocks.installedNames.mockResolvedValue(['verify-security', 'verify-change'])
+    if (source === 'manifest')
+      mocks.pathExists.mockImplementation(async (path: string) => path.endsWith('/.ccg-skills/manifest.json'))
+    await init({ skipPrompt: true, skipMcp: true, installDir: '/tmp/ccg-init-test' })
+    expect(mocks.removeSkills).toHaveBeenCalledWith(['verify-security'], expect.any(Object))
+    expect(mocks.writeConfig.mock.calls[0][0].performance.skillsProfile).toEqual(['verify-change'])
+    expect(mocks.install.mock.calls[0][3].skillsProfile).toEqual(['verify-change'])
+    expect(mocks.spinnerFailed).not.toHaveBeenCalled()
+  })
+
+  it.each(['cancelled', 'aborted'])('leaves the manifest and aliases untouched when init is %s', async (outcome) => {
+    const root = await mkdtemp(join(tmpdir(), 'ccg-cancel-init-'))
+    const store = join(root, '.ccg-skills')
+    const target = join(store, 'snapshots', 'retired')
+    const alias = join(root, 'skills', 'ccg-verify-security')
+    const manifestPath = join(store, 'manifest.json')
+    const manifest = JSON.stringify({ skills: [{ name: 'verify-security', target }] })
+    try {
+      await mkdir(target, { recursive: true })
+      await mkdir(join(root, 'skills'))
+      await writeFile(manifestPath, manifest)
+      await symlink(target, alias, process.platform === 'win32' ? 'junction' : 'dir')
+      const originalTarget = await readlink(alias)
+      mocks.existing.performance.skillsProfile = ['verify-security', 'verify-change']
+      mocks.pathExists.mockImplementation(async (path: string) => path === manifestPath)
+      mocks.installedNames.mockResolvedValue(['verify-security', 'verify-change'])
+      answerInitQuestions({ skillsMode: 'custom', selectedSkills: ['verify-change'], action: 'cancel' })
+      if (outcome === 'aborted')
+        mocks.prompt.mockRejectedValueOnce(new Error('Prompt aborted'))
+      const result = init({ skipMcp: true, installDir: root })
+      if (outcome === 'aborted')
+        await expect(result).rejects.toThrow('Prompt aborted')
+      else
+        await result
+      expect(mocks.removeSkills).not.toHaveBeenCalled()
+      expect(mocks.writeConfig).not.toHaveBeenCalled()
+      expect(mocks.install).not.toHaveBeenCalled()
+      expect(await readFile(manifestPath, 'utf8')).toBe(manifest)
+      expect(await readlink(alias)).toBe(originalTarget)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
   })
 
   it('preserves an empty manifest selection after standalone removals', async () => {

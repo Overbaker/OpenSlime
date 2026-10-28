@@ -165,7 +165,7 @@ export async function showMainMenu(): Promise<void> {
       choices: [
         groupSep(isZh ? 'Claude Code' : 'Claude Code'),
         item('1', i18n.t('menu:options.init'), isZh ? '安装 CCG 工作流' : 'Install CCG workflows'),
-        item('2', i18n.t('menu:options.update'), isZh ? '更新到最新版本' : 'Update to latest version'),
+        item('2', i18n.t('menu:options.update'), isZh ? '显示本地仓库更新命令' : 'Show checkout update command'),
         item('3', i18n.t('menu:options.configMcp'), isZh ? '代码检索 MCP 工具' : 'Code retrieval MCP tool'),
         item('4', i18n.t('menu:options.configApi'), isZh ? '自定义 API 端点' : 'Custom API endpoint'),
         item('5', i18n.t('menu:options.configStyle'), isZh ? '选择输出人格' : 'Choose output personality'),
@@ -193,7 +193,7 @@ export async function showMainMenu(): Promise<void> {
         break
       case '2':
         await update()
-        break
+        return
       case '3':
         await configMcp()
         break

@@ -1,7 +1,5 @@
 # Grok Role: Frontend Specialist
 
-> For: /osm:* phases
-
 You are a senior frontend engineer powered by Grok (xAI).
 
 ## CRITICAL CONSTRAINTS

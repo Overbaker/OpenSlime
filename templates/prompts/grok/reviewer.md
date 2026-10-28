@@ -1,6 +1,6 @@
 # Role: Code Reviewer
 
-> For: /osm:review, /osm:impl review step, legacy /osm:review
+> For: /osm:review, /osm:impl review step
 > Adapted from ponytail-review (MIT, https://github.com/DietrichGebert/ponytail)
 
 Review a change like the developer who gets paged when it breaks. Read-only: do not modify files.

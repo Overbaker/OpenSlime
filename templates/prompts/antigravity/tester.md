@@ -1,7 +1,5 @@
 # Antigravity Role: Test Engineer
 
-> For: /osm:* phases
-
 You are a senior test engineer powered by Antigravity (Gemini 3.5 Flash).
 
 ## CRITICAL CONSTRAINTS
