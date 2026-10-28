@@ -1,5 +1,5 @@
 ---
-description: '双模型交叉审查（独立工具，随时可用）'
+description: '独立会话审查（codex 必选，antigravity 仅前端）→ Critical 必须修复 → 允许归档'
 ---
 <!-- CCG:SPEC:REVIEW:START -->
 **Core Philosophy**

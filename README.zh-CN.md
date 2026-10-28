@@ -11,7 +11,7 @@
 
 | 部分 | 作用 |
 |---|---|
-| `/osm:init → /osm:research → /osm:plan → /osm:impl → /osm:review` | OpenSpec 串行链。`/osm:impl` 中 codex 写后端、antigravity 写前端，各自只改明确列出的文件。Claude 负责监控：拆任务、审 diff、把所有修复退回给执行者，自己不写产品代码。最后由新会话独立审查。 |
+| `/osm:init → /osm:research → /osm:plan → /osm:impl → /osm:review` | OpenSpec 串行链。`/osm:impl` 中 codex 写后端、antigravity 写前端，各自只改明确列出的文件。Claude 负责监控：拆任务、审 diff，只自己改不改行为的 ≤5 行机械性问题，改逻辑的退回执行者。加 `--compare[=<skill>]` 时，Claude 另开一个子 agent 在独立 worktree 里写同一任务，由审查者留下更好的结果。最后由新会话独立审查。 |
 | `~/.claude/bin/codeagent-wrapper` | 统一调用各后端，支持 `resume <session>` 和带 `dependencies:` 的 `--parallel`。 |
 | `~/.claude/.ccg/prompts/<backend>/` | 各后端的角色提示词（analyzer、architect、builder、reviewer 等）。 |
 | 按需技能 | `frontend-design`、`scrapling`、`seo-page-builder`、`bt-panel`、`adsense-site-auditor`，调用前不注入任何内容。 |

@@ -13,7 +13,7 @@
 
 | Part | Purpose |
 |---|---|
-| `/osm:init → /osm:research → /osm:plan → /osm:impl → /osm:review` | OpenSpec chain. In `/osm:impl` codex writes backend code and antigravity writes frontend code, each limited to an explicit file list. Claude supervises: it scopes tasks, reviews diffs and sends every fix back to the writer, but does not write product code. A fresh session reviews the result. |
+| `/osm:init → /osm:research → /osm:plan → /osm:impl → /osm:review` | OpenSpec chain. In `/osm:impl` codex writes backend code and antigravity writes frontend code, each limited to an explicit file list. Claude supervises: it scopes tasks and reviews diffs, fixes only mechanical ≤5-line issues itself and sends logic changes back to the writer. `--compare[=<skill>]` adds an optional Claude subagent that writes the same task in an isolated worktree; the reviewer keeps the better result. A fresh session reviews the result. |
 | `~/.claude/commands/osm/` | Slash commands (`/osm:*`). Upgrading moves the old `/ccg:*` commands aside. |
 | `~/.claude/bin/codeagent-wrapper` | One CLI for every backend, with `resume <session>` and `--parallel` tasks ordered by `dependencies:`. |
 | `~/.claude/.ccg/prompts/<backend>/` | Role prompts (analyzer, architect, builder, reviewer, …). |

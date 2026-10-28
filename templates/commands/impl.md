@@ -5,13 +5,16 @@ description: 'codex/antigravity 按任务写代码，Claude 监控审查 + 归�
 **Core Philosophy**
 - Implementation is pure mechanical execution—all decisions were made in Plan phase.
 - Writers: {{BACKEND_PRIMARY}} writes backend/logic/tests, {{FRONTEND_PRIMARY}} writes frontend/UI.
-- Claude supervises: scopes each task, reviews the diff, routes every fix back to the writer. Claude does not write product code.
+- Claude supervises: scopes each task, reviews the diff and decides who fixes what (see Fix Rules).
 - Keep changes tightly scoped; enforce side-effect review before any modification.
 - Minimize documentation—prefer self-explanatory code over comments.
 
 **Guardrails**
 - Every external call names the exact files it may change. Anything outside that list is reverted, not merged.
-- Claude edits only OpenSpec artifacts (e.g. `tasks.md` checkboxes). Product code changes, including one-line fixes, go back to the writer via `resume`.
+- **Fix Rules**:
+  1. Mechanical, behavior-preserving fix of ≤5 lines (typo, import, rename, lint, type annotation): Claude fixes it, then re-runs the task's VERIFY command.
+  2. Any change to logic, branches or interfaces, or more than 5 lines: `resume` the writer with `file:line`, the problem and the expected result.
+  3. Writer failed twice or its CLI is unavailable: ask the user before Claude takes over the task.
 - If the working tree holds unrelated uncommitted work, stop and ask the user before delegating.
 - Keep implementation strictly within `tasks.md` scope—no scope creep.
 - Refer to `openspec/config.yaml` for conventions.
@@ -59,10 +62,16 @@ description: 'codex/antigravity 按任务写代码，Claude 监控审查 + 归�
    ```
    Save each returned `SESSION_ID` to resume the same writer for fixes.
 
+   **Optional comparison writer** (only when `$ARGUMENTS` contains `--compare` or the user asks; doubles writing cost, use for high-risk or design-uncertain tasks):
+   - In the same message as the writer call, spawn one Claude subagent: `Agent({ subagent_type: "general-purpose", isolation: "worktree", run_in_background: true, prompt })`.
+   - Its prompt: first load the named skill with the Skill tool (e.g. `--compare=<skill>`; otherwise none), then implement the same TASK within the same FILES list, run VERIFY, and report the diff summary and VERIFY output. It must not touch the main working tree.
+   - The worktree starts from `HEAD`: skip comparison for a task that depends on uncommitted earlier tasks.
+   - When both finish, give both diffs to the independent reviewer (Step 6) and keep the one that passes VERIFY with fewer Critical findings; on a tie keep the smaller diff. Discard the other; only the kept result lands in the main tree.
+
 5. **Review the Diff**
    - `git diff` the task's files. Revert edits outside the allowed list.
    - Check: within `tasks.md` scope, no unrelated modules touched, no new dependencies, existing interfaces intact, verify command passes.
-   - Any fix, however small: `resume` the writer session with `file:line`, the problem and the expected result, then re-check the diff.
+   - Apply the Fix Rules, then re-check the diff.
 
 6. **Independent Review**
    - {{BACKEND_PRIMARY}} is required. Add {{FRONTEND_PRIMARY}} only when the change touches frontend/UI code or the user asks for a second opinion. When both run, launch them in ONE message with `run_in_background: true`.
@@ -95,7 +104,7 @@ description: 'codex/antigravity 按任务写代码，Claude 监控审查 + 归�
    - 前端模型失败：说明原因，用后端结果继续，不重试。
 
    - Use a fresh session (no `resume`): the writer reviewing its own work misses the same things twice.
-   - Send Critical and Warning findings to the writer session (`resume`), then review the changed files again in a fresh session. Stop after 3 rounds and report to the user.
+   - Handle Critical and Warning findings with the Fix Rules, then review the changed files again in a fresh session. Stop after 3 rounds and report to the user.
 
 7. **Update Task Status**
    - Mark completed task in `tasks.md`: `- [x] Task description`
