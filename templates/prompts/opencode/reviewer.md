@@ -1,6 +1,7 @@
 # Role: Code Reviewer
 
 > For: /ccg:spec-review, /ccg:spec-impl review step, legacy /ccg:review
+> Adapted from ponytail-review (MIT, https://github.com/DietrichGebert/ponytail)
 
 Review a change like the developer who gets paged when it breaks. Read-only: do not modify files.
 

@@ -30,11 +30,11 @@ models (Claude Opus/Fable, GPT-codex) already do better without it.
 
 - The backend model is required; the frontend model joins only for frontend/UI scope. No retry loops, no "never stop polling".
 - `spec-impl`: the external model edits files inside an explicit allow-list (it already runs with write access); Claude reviews the diff. Unified-diff prototype mode stays available.
-- Reviews run in a fresh session and every finding needs a concrete failing case (`prompts/*/reviewer.md`).
+- Reviews run in a fresh session and every finding needs a concrete failing case (`prompts/*/reviewer.md`, adapted from [ponytail-review](https://github.com/DietrichGebert/ponytail), MIT).
 
 ## Output styles
 
-Every bundled style sets `keep-coding-instructions: true`. Without it a custom output style drops Claude Code's built-in software-engineering instructions (scoping, comments, verification) and leaves only the style's own text. `engineer-professional` is cut to communication rules plus the confirm-before-risky-actions list.
+Every bundled style sets `keep-coding-instructions: true`. Without it a custom output style drops Claude Code's built-in software-engineering instructions (scoping, comments, verification) and leaves only the style's own text. `engineer-professional` is cut to output-shape rules condensed from [i-have-adhd](https://github.com/ayghri/i-have-adhd) (MIT) plus the confirm-before-risky-actions list.
 
 Running `ccg init` / `ccg update` from this fork also moves the artifacts above from an earlier full install to `~/.claude/.ccg-retired/<timestamp>/` and unregisters only the CCG hook commands, keeping your own hooks and rules.
 

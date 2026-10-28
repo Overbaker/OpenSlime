@@ -61,7 +61,7 @@ Wrapper environment (in `~/.claude/settings.json` → `env`): `CODEX_TIMEOUT` (m
 
 ## Credits
 
-Upstream [fengshao1227/ccg-workflow](https://github.com/fengshao1227/ccg-workflow) and its contributors · [stellarlinkco/myclaude](https://github.com/stellarlinkco/myclaude) (wrapper inspiration) · [ace-tool](https://linux.do/t/topic/1344562).
+Upstream [fengshao1227/ccg-workflow](https://github.com/fengshao1227/ccg-workflow) and its contributors · [stellarlinkco/myclaude](https://github.com/stellarlinkco/myclaude) (wrapper inspiration) · [ace-tool](https://linux.do/t/topic/1344562) · review criteria adapted from [ponytail](https://github.com/DietrichGebert/ponytail) · output shape condensed from [i-have-adhd](https://github.com/ayghri/i-have-adhd) (both MIT).
 
 ## License
 

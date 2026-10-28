@@ -45,7 +45,7 @@ node bin/ccg.mjs uninstall
 
 ## 致谢
 
-上游 [fengshao1227/ccg-workflow](https://github.com/fengshao1227/ccg-workflow) 及其贡献者 · [stellarlinkco/myclaude](https://github.com/stellarlinkco/myclaude)（wrapper 灵感）· [ace-tool](https://linux.do/t/topic/1344562)。
+上游 [fengshao1227/ccg-workflow](https://github.com/fengshao1227/ccg-workflow) 及其贡献者 · [stellarlinkco/myclaude](https://github.com/stellarlinkco/myclaude)（wrapper 灵感）· [ace-tool](https://linux.do/t/topic/1344562) · 审查标准改编自 [ponytail](https://github.com/DietrichGebert/ponytail) · 输出形态精简自 [i-have-adhd](https://github.com/ayghri/i-have-adhd)（均为 MIT）。
 
 ## 许可证
 
