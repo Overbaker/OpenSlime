@@ -1,54 +1,56 @@
-# OpenSlime — 最简的 Claude 主导多 agent 协作
+# OpenSlime
 
-> 设计原则见 [PRINCIPLES.md](PRINCIPLES.md)。为兼容已有安装，CLI 仍叫 `ccg`，包名仍是 `ccg-workflow`。
+基于 OpenSpec 的极简 Claude 主导多 agent 协同开发框架；Claude 统筹编排，Codex 编写后端，Antigravity 编写前端。
 
-> **这是 [fengshao1227/ccg-workflow](https://github.com/fengshao1227/ccg-workflow) 的精简 fork。**
-> 保留多模型串行链；移除每轮注入的 hooks、常驻路由规则、`/osm:go` 引擎、正则质量关卡，以及 DeepSeek Harness（`dsh-ccg`）插件。**不支持把 DSH 作为宿主。**
-> Claude 始终是编排者，Codex、Gemini、Antigravity、Grok、Kimi、OpenCode、Claude 通过 `codeagent-wrapper` 作为执行者被调用。可选的 Codex 主导模式（`ccg codex-mode`）与上游一致，未改动。
-> 删了什么、为什么删：[FORK.md](FORK.md)。English: [README.md](README.md)
+[fengshao1227/ccg-workflow](https://github.com/fengshao1227/ccg-workflow) 的精简 fork（MIT）。[English](README.md)
 
-## 安装内容
+## 让 AI Agent 安装
 
-| 部分 | 作用 |
-|---|---|
-| `/osm:init → /osm:research → /osm:plan → /osm:impl → /osm:review` | OpenSpec 串行链。`/osm:impl` 中 codex 写后端、antigravity 写前端，各自只改明确列出的文件。Claude 负责监控：拆任务、审 diff，只自己改不改行为的 ≤5 行机械性问题，改逻辑的退回执行者。加 `--compare[=<skill>]` 时，Claude 另开一个子 agent 在独立 worktree 里写同一任务，由审查者留下更好的结果。最后由新会话独立审查。 |
-| `~/.claude/bin/codeagent-wrapper` | 统一调用各后端，支持 `resume <session>` 和带 `dependencies:` 的 `--parallel`。 |
-| `~/.claude/.ccg/prompts/<backend>/` | 各后端的角色提示词（analyzer、architect、builder、reviewer 等）。 |
-| 按需技能 | `frontend-design`、`scrapling`、`seo-page-builder`、`bt-panel`、`adsense-site-auditor`，调用前不注入任何内容。 |
-| 输出样式 | 全部设置 `keep-coding-instructions: true`，保留 Claude Code 内置的工程规范。 |
+将以下内容发送给你的 AI coding agent（Claude Code、Codex）：
 
-每个会话唯一常驻的文本是 `rules/ccg-codegraph.md`，不注册任何 hook。
-
-## 安装
-
-需要 Node.js 20+、pnpm 和 Claude Code。各后端 CLI（codex、gemini、agy、grok、kimi、opencode）可选。
-
-```bash
-git clone https://gitea.aimo3d.org/han/OpenSlime.git && cd OpenSlime
-pnpm install && pnpm build
-node bin/ccg.mjs init                                  # 交互式
-node bin/ccg.mjs init --skip-prompt --skip-mcp --force # 默认配置
+```text
+Install OpenSlime from https://github.com/Overbaker/OpenSlime. Follow AGENTS.md in that repo, then run its doctor check and tell me the result.
 ```
 
-之后不要再运行 `npx ccg-workflow`，那会装回上游版本，把删掉的部分带回来。
+手动安装步骤详见 [AGENTS.md](AGENTS.md)。
 
-在上游安装之上升级时，退役文件会移到 `~/.claude/.ccg-retired/<时间戳>/`，只注销 CCG 自己的 hook 命令；你自己的 hooks、rules 和 settings 保持不变。
+## 工作流程
 
-## 命令
+1. `/osm:init`：配置 OpenSpec 并检查模型 CLI。
+2. `/osm:research`：需求分析 &rarr; 约束提取与 OpenSpec 提案。
+3. `/osm:plan`：零决策方案设计（specs、design、`tasks.md`）。
+4. `/osm:impl`：分发执行各任务。
+5. `/osm:review`：归档前的独立会话复审。
+
+- **`/osm:impl` 角色分工**：`codex` 编写后端/逻辑/测试；`antigravity` 编写前端/UI（仅限 UI 范围）。每个任务显式列出执行者允许修改的文件白名单。
+- **Claude 监督审查**：Claude 划定任务范围并审查代码 diff。
+- **修复规则（Fix Rules）**：保持行为不变的 &le;5 行机械性修改（拼写、import、类型标注等）由 Claude 直接修复并重新执行 `VERIFY`；涉及逻辑、分支、接口变更或 >5 行的问题通过 `resume` 退回原执行者修改；同一执行者连续失败 2 次后 Claude 征求用户意见再决定是否接管。
+- **独立审查**：审查在全新的独立会话中运行，且该会话未参与代码编写。
+- **可选对比模式**：`/osm:impl --compare[=<skill>]` 会在独立 git worktree 中启动 Claude 子 agent 编写同一任务（可指定加载 skill）；复审者选择通过 `VERIFY` 且 Critical 缺陷更少的结果（双倍编写成本，适用于高风险任务）。
+
+## 为何轻量
+
+- **无每轮注入**：唯一常驻文本是一个精简规则文件（`rules/ccg-codegraph.md`）；无 hooks。内置技能（`frontend-design`、`scrapling`、`seo-page-builder`、`bt-panel`、`adsense-site-auditor`）仅在调用时按需加载。输出样式保留 Claude Code 内置的工程规范（`keep-coding-instructions: true`）。
+- **单一主循环**：Claude 负责规划、决策并与用户交互，前面无路由层或多层规划 agent。
+- **外部模型物尽其用**：仅在划定范围的代码编写（`codex` 后端、`antigravity` 前端）或新会话独立复审中调用外部模型。不支持把 DeepSeek Harness 作为宿主；保留 Codex 主导模式（`node bin/ccg.mjs codex-mode install`）与所有 wrapper 后端（`codex`、`claude`、`gemini`、`antigravity`、`grok`、`kimi`、`opencode`）。
+
+设计原则详见 [PRINCIPLES.md](PRINCIPLES.md)，上游移除组件与原因详见 [FORK.md](FORK.md)。
+
+## 环境要求
+
+- Node.js 20+、pnpm、git、Claude Code。
+- Codex CLI（`codex`，已登录）。
+- 可选：Antigravity CLI（`agy`）。
+- OpenSpec CLI：`npm i -g @fission-ai/openspec`（或由 `/osm:init` 自动引导安装）。
+
+## 更新与卸载
 
 ```bash
-node bin/ccg.mjs                 # 菜单（同时安装为 `osm`）
-node bin/ccg.mjs init            # 安装 / 重装
-node bin/ccg.mjs doctor [--json] # 健康检查
-node bin/ccg.mjs skills list     # 原生技能选择
-node bin/ccg.mjs codex-mode install|uninstall
-node bin/ccg.mjs uninstall
+# Update
+cd ~/OpenSlime && git pull && pnpm install && pnpm build && node bin/ccg.mjs init --skip-prompt --skip-mcp --force
+
+# Uninstall
+cd ~/OpenSlime && node bin/ccg.mjs uninstall
 ```
 
-## 致谢
-
-上游 [fengshao1227/ccg-workflow](https://github.com/fengshao1227/ccg-workflow) 及其贡献者 · [stellarlinkco/myclaude](https://github.com/stellarlinkco/myclaude)（wrapper 灵感）· [ace-tool](https://linux.do/t/topic/1344562) · 审查标准改编自 [ponytail](https://github.com/DietrichGebert/ponytail) · 输出形态精简自 [i-have-adhd](https://github.com/ayghri/i-have-adhd)（均为 MIT）。
-
-## 许可证
-
-MIT，见 [LICENSE](LICENSE)。
+> 致谢：上游 [fengshao1227/ccg-workflow](https://github.com/fengshao1227/ccg-workflow) 及其贡献者；[stellarlinkco/myclaude](https://github.com/stellarlinkco/myclaude)（codeagent-wrapper）；审查标准改编自 [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail)；输出形态精简自 [ayghri/i-have-adhd](https://github.com/ayghri/i-have-adhd)；ace-tool。均遵循 MIT 协议。许可证：MIT（[LICENSE](LICENSE)）。

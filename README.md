@@ -1,71 +1,56 @@
-# OpenSlime — minimal Claude-led multi-agent collaboration
+# OpenSlime
 
-> Design rules: [PRINCIPLES.md](PRINCIPLES.md). The CLI is still `ccg` / package `ccg-workflow` for compatibility with existing installs.
+Minimal Claude-led multi-agent collaboration on OpenSpec; Claude orchestrates, codex writes backend, antigravity writes frontend.
 
-> **This is a slimmed-down fork** of [fengshao1227/ccg-workflow](https://github.com/fengshao1227/ccg-workflow).
-> It keeps the multi-model serial chain and removes per-turn hooks, always-on routing rules, the `/osm:go` engine,
-> regex quality gates and the DeepSeek Harness (`dsh-ccg`) plugin. **DSH as a host is not supported.**
-> Claude stays the orchestrator; Codex, Gemini, Antigravity, Grok, Kimi, OpenCode and Claude are called as workers
-> through `codeagent-wrapper`. The optional Codex-led mode (`ccg codex-mode`) is unchanged from upstream.
-> What was removed and why: [FORK.md](FORK.md). 中文：[README.zh-CN.md](README.zh-CN.md)
+Slim fork of [fengshao1227/ccg-workflow](https://github.com/fengshao1227/ccg-workflow) (MIT). [中文文档](README.zh-CN.md)
 
-## What it installs
+## Install with your AI agent
 
-| Part | Purpose |
-|---|---|
-| `/osm:init → /osm:research → /osm:plan → /osm:impl → /osm:review` | OpenSpec chain. In `/osm:impl` codex writes backend code and antigravity writes frontend code, each limited to an explicit file list. Claude supervises: it scopes tasks and reviews diffs, fixes only mechanical ≤5-line issues itself and sends logic changes back to the writer. `--compare[=<skill>]` adds an optional Claude subagent that writes the same task in an isolated worktree; the reviewer keeps the better result. A fresh session reviews the result. |
-| `~/.claude/commands/osm/` | Slash commands (`/osm:*`). Upgrading moves the old `/ccg:*` commands aside. |
-| `~/.claude/bin/codeagent-wrapper` | One CLI for every backend, with `resume <session>` and `--parallel` tasks ordered by `dependencies:`. |
-| `~/.claude/.ccg/prompts/<backend>/` | Role prompts (analyzer, architect, builder, reviewer, …). |
-| On-demand skills | `frontend-design`, `scrapling`, `seo-page-builder`, `bt-panel`, `adsense-site-auditor`. Nothing is injected until you call them. |
-| Output styles | All set `keep-coding-instructions: true`, so Claude Code's built-in engineering instructions stay active. |
+Paste this prompt to your AI coding agent (Claude Code, Codex):
 
-Per session, the only always-on text is `rules/ccg-codegraph.md`. No hooks are registered.
+```text
+Install OpenSlime from https://github.com/Overbaker/OpenSlime. Follow AGENTS.md in that repo, then run its doctor check and tell me the result.
+```
 
-## Install
+Manual install steps are in [AGENTS.md](AGENTS.md).
 
-Requires Node.js 20+, pnpm and Claude Code. Backend CLIs (codex, gemini, agy, grok, kimi, opencode) are optional.
+## How it works
+
+1. `/osm:init`: Set up OpenSpec and check model CLIs.
+2. `/osm:research`: Requirement &rarr; constraints + OpenSpec proposal.
+3. `/osm:plan`: Zero-decision plan (specs, design, `tasks.md`).
+4. `/osm:impl`: Delegate each task.
+5. `/osm:review`: Independent-session review before archive.
+
+- **Roles in `/osm:impl`**: `codex` writes backend/logic/tests; `antigravity` writes frontend/UI (only for UI scope). Each task lists the exact files the writer may change.
+- **Claude supervises**: Claude scopes tasks and reviews the diff.
+- **Fix Rules**: Claude fixes mechanical behavior-preserving issues of &le;5 lines itself and re-runs `VERIFY`; logic/interface changes or >5 lines go back to the writer via `resume`; after two writer failures Claude asks the user before taking over.
+- **Independent reviews**: Reviews run in a fresh session that did not write the code.
+- **Optional comparison**: `/osm:impl --compare[=<skill>]` has a Claude subagent write the same task in an isolated git worktree (optionally loading a skill); the reviewer keeps the result that passes `VERIFY` with fewer Critical findings (doubles writing cost; for high-risk tasks).
+
+## Why it is small
+
+- **No per-turn injection**: The only always-on text is one small rule file (`rules/ccg-codegraph.md`); no hooks. Skills (`frontend-design`, `scrapling`, `seo-page-builder`, `bt-panel`, `adsense-site-auditor`) load only when called. Output styles keep Claude Code's built-in coding instructions (`keep-coding-instructions: true`).
+- **Single main loop**: Claude plans, decides, and talks to the user—no routers or orchestrators in front of it.
+- **External models only where they earn it**: Used only for scoped writing (`codex` backend, `antigravity` frontend) or independent verification in a fresh session. DeepSeek Harness as a host is not supported; Codex-led mode (`node bin/ccg.mjs codex-mode install`) and all wrapper backends (`codex`, `claude`, `gemini`, `antigravity`, `grok`, `kimi`, `opencode`) are kept.
+
+See [PRINCIPLES.md](PRINCIPLES.md) for design rules and [FORK.md](FORK.md) for removed parts and reasons.
+
+## Requirements
+
+- Node.js 20+, pnpm, git, Claude Code.
+- Codex CLI (`codex`, logged in).
+- Optional: Antigravity CLI (`agy`).
+- OpenSpec CLI: `npm i -g @fission-ai/openspec` (or `/osm:init` installs/guides it).
+
+## Update and uninstall
 
 ```bash
-git clone https://gitea.aimo3d.org/han/OpenSlime.git && cd OpenSlime
-pnpm install && pnpm build
-node bin/ccg.mjs init                                  # interactive
-node bin/ccg.mjs init --skip-prompt --skip-mcp --force # defaults
+# Update
+cd ~/OpenSlime && git pull && pnpm install && pnpm build && node bin/ccg.mjs init --skip-prompt --skip-mcp --force
+
+# Uninstall
+cd ~/OpenSlime && node bin/ccg.mjs uninstall
 ```
 
-Do not run `npx ccg-workflow` afterwards: that installs upstream and brings the removed parts back.
-
-Upgrading over an upstream install moves retired files to `~/.claude/.ccg-retired/<timestamp>/` and unregisters only CCG's own hook commands; your hooks, rules and settings stay.
-
-## CLI
-
-```bash
-node bin/ccg.mjs                 # menu (also installed as `osm`)
-node bin/ccg.mjs init            # install / reinstall
-node bin/ccg.mjs doctor [--json] # health check
-node bin/ccg.mjs skills list     # native skill selection
-node bin/ccg.mjs codex-mode install|uninstall
-node bin/ccg.mjs uninstall
-```
-
-## Layout
-
-```
-~/.claude/
-├── commands/osm/          # /osm:* chain and skill commands
-├── skills/ccg/            # on-demand skills
-├── rules/ccg-codegraph.md
-├── .ccg/config.toml       # model routing
-├── .ccg/prompts/          # role prompts per backend
-└── bin/codeagent-wrapper
-```
-
-Wrapper environment (in `~/.claude/settings.json` → `env`): `CODEX_TIMEOUT` (ms, default 7200000), `CODEX_REQUIRE_APPROVAL` (`true` disables Codex's bypass mode).
-
-## Credits
-
-Upstream [fengshao1227/ccg-workflow](https://github.com/fengshao1227/ccg-workflow) and its contributors · [stellarlinkco/myclaude](https://github.com/stellarlinkco/myclaude) (wrapper inspiration) · [ace-tool](https://linux.do/t/topic/1344562) · review criteria adapted from [ponytail](https://github.com/DietrichGebert/ponytail) · output shape condensed from [i-have-adhd](https://github.com/ayghri/i-have-adhd) (both MIT).
-
-## License
-
-MIT, see [LICENSE](LICENSE).
+> Credits: upstream [fengshao1227/ccg-workflow](https://github.com/fengshao1227/ccg-workflow) and contributors; [stellarlinkco/myclaude](https://github.com/stellarlinkco/myclaude) (codeagent-wrapper); review criteria adapted from [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail); output shape condensed from [ayghri/i-have-adhd](https://github.com/ayghri/i-have-adhd); ace-tool. All MIT. License: MIT ([LICENSE](LICENSE)).

@@ -95,7 +95,7 @@ description: '初始化 OpenSpec (OPSX) 环境 + 验证多模型 MCP 工具'
 **Reference**
 - OpenSpec (OPSX) CLI: `npx @fission-ai/openspec --help`
 - Profile Management: `openspec config profile`
-- OpenSlime: https://gitea.aimo3d.org/han/OpenSlime (do not run `npx ccg-workflow`)
+- OpenSlime: https://github.com/Overbaker/OpenSlime (do not run `npx ccg-workflow`)
 - 后端/前端模型 MCP: Bundled with codeagent-wrapper
 - Node.js >= 18.x required for OpenSpec
 <!-- CCG:SPEC:INIT:END -->

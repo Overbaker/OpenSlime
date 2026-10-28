@@ -49,7 +49,6 @@ ceshi/
 # Local spec workflows (OpenSpec 本地数据)
 .spec-workflow/
 openspec/
-/AGENTS.md
 
 WINDOWS_FIX.md
 
