@@ -24,7 +24,7 @@
 需要 Node.js 20+、pnpm 和 Claude Code。各后端 CLI（codex、gemini、agy、grok、kimi、opencode）可选。
 
 ```bash
-git clone <本仓库地址> ccg-slim && cd ccg-slim
+git clone https://gitea.aimo3d.org/han/OpenSlime.git && cd OpenSlime
 pnpm install && pnpm build
 node bin/ccg.mjs init                                  # 交互式
 node bin/ccg.mjs init --skip-prompt --skip-mcp --force # 默认配置
