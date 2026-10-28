@@ -1,4 +1,6 @@
-# CCG 精简版 — Claude 主导的多模型工作流
+# OpenSlime — 最简的 Claude 主导多 agent 协作
+
+> 设计原则见 [PRINCIPLES.md](PRINCIPLES.md)。为兼容已有安装，CLI 仍叫 `ccg`，包名仍是 `ccg-workflow`。
 
 > **这是 [fengshao1227/ccg-workflow](https://github.com/fengshao1227/ccg-workflow) 的精简 fork。**
 > 保留多模型串行链；移除每轮注入的 hooks、常驻路由规则、`/ccg:go` 引擎、正则质量关卡，以及 DeepSeek Harness（`dsh-ccg`）插件。**不支持把 DSH 作为宿主。**
@@ -22,7 +24,7 @@
 需要 Node.js 20+、pnpm 和 Claude Code。各后端 CLI（codex、gemini、agy、grok、kimi、opencode）可选。
 
 ```bash
-git clone -b slim <本仓库地址> ccg-slim && cd ccg-slim
+git clone <本仓库地址> ccg-slim && cd ccg-slim
 pnpm install && pnpm build
 node bin/ccg.mjs init                                  # 交互式
 node bin/ccg.mjs init --skip-prompt --skip-mcp --force # 默认配置

@@ -41,7 +41,7 @@ Running `ccg init` / `ccg update` from this fork also moves the artifacts above 
 ## Install
 
 ```bash
-git clone -b slim <this-repo-url> ccg-slim && cd ccg-slim
+git clone https://gitea.aimo3d.org/han/OpenSlime.git && cd OpenSlime
 pnpm install && pnpm build
 node bin/ccg.mjs init            # or: node bin/ccg.mjs init --skip-prompt --skip-mcp --force
 ```

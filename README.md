@@ -1,4 +1,6 @@
-# CCG Slim — Claude-led multi-model workflow
+# OpenSlime — minimal Claude-led multi-agent collaboration
+
+> Design rules: [PRINCIPLES.md](PRINCIPLES.md). The CLI is still `ccg` / package `ccg-workflow` for compatibility with existing installs.
 
 > **This is a slimmed-down fork** of [fengshao1227/ccg-workflow](https://github.com/fengshao1227/ccg-workflow).
 > It keeps the multi-model serial chain and removes per-turn hooks, always-on routing rules, the `/ccg:go` engine,
@@ -24,7 +26,7 @@ Per session, the only always-on text is `rules/ccg-codegraph.md`. No hooks are r
 Requires Node.js 20+, pnpm and Claude Code. Backend CLIs (codex, gemini, agy, grok, kimi, opencode) are optional.
 
 ```bash
-git clone -b slim <this-repo-url> ccg-slim && cd ccg-slim
+git clone https://gitea.aimo3d.org/han/OpenSlime.git && cd OpenSlime
 pnpm install && pnpm build
 node bin/ccg.mjs init                                  # interactive
 node bin/ccg.mjs init --skip-prompt --skip-mcp --force # defaults
