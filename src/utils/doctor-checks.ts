@@ -37,12 +37,6 @@ export interface DoctorDependencies {
   skillPaths?: Partial<Record<'claude' | 'codex', SkillManagerOptions>>
 }
 type RecordValue = Record<string, unknown>
-const HOOK_FILES = ['task-utils.js', 'workflow-state.js', 'session-start.js', 'subagent-context.js', 'skill-router.js']
-const HOOK_EVENTS: Record<string, string[]> = {
-  UserPromptSubmit: ['workflow-state.js', 'skill-router.js'],
-  SessionStart: ['session-start.js'],
-  PreToolUse: ['subagent-context.js'],
-}
 const BACKENDS: Record<string, { label: string, commands: string[], windows: string[] }> = {
   codex: { label: 'Codex CLI', commands: ['codex'], windows: ['codex.cmd', 'codex.exe'] },
   gemini: { label: 'Gemini CLI', commands: ['gemini'], windows: ['gemini.cmd'] },
@@ -151,26 +145,20 @@ function references(command: string, path: string): boolean {
 }
 
 async function claudeChecks(installDir: string, commandFiles: string[]): Promise<DoctorCheck[]> {
-  const hookDir = join(installDir, 'hooks', 'ccg')
-  const hookFiles = await files(hookDir)
-  const missing = HOOK_FILES.filter(f => !hookFiles.includes(f))
-  const settings = await readText(join(installDir, 'settings.json'))
+  // Slim fork ships no per-turn hooks; leftovers from a full install only add injected context.
+  const leftoverHooks = await fs.pathExists(join(installDir, 'hooks', 'ccg'))
   let registered = 0
   try {
-    const json = record(JSON.parse(settings || '{}'))
-    for (const [event, handlers] of Object.entries(HOOK_EVENTS)) {
-      const commands = registeredCommands(json, event)
-      registered += handlers.filter(name => commands.some(cmd => references(cmd, join(hookDir, name)))).length
-    }
+    const json = record(JSON.parse(await readText(join(installDir, 'settings.json')) || '{}'))
+    for (const event of Object.keys(record(json.hooks)))
+      registered += registeredCommands(json, event).filter(cmd => /hooks[\\/]ccg[\\/]/.test(normalized(cmd))).length
   }
   catch { /* Report broken registration without echoing settings or errors. */ }
   const rules = (await files(join(installDir, 'rules'))).filter(f => f.startsWith('ccg-') && f.endsWith('.md'))
-  const hasEngineCommand = await fs.pathExists(join(installDir, 'commands', 'ccg.md'))
   return [
-    check('claude.commands', 'Commands', commandFiles.length > 0 || hasEngineCommand ? 'pass' : 'fail', `${commandFiles.length} workflow commands${hasEngineCommand ? ', engine entry installed' : ''}`),
-    check('claude.hooks', 'Hooks', missing.length === 0 ? 'pass' : 'fail', `${5 - missing.length}/5 scripts${missing.length ? `; missing: ${missing.join(', ')}` : ''}`),
-    check('claude.hook-registration', 'Hook registration', registered === 4 ? 'pass' : 'fail', `${registered}/4 handlers across 3 events in settings.json`),
-    check('claude.rules', 'Rules', rules.length >= 2 ? 'pass' : 'warn', `${rules.length} CCG rules installed`),
+    check('claude.commands', 'Commands', commandFiles.length > 0 ? 'pass' : 'fail', `${commandFiles.length} workflow commands`),
+    check('claude.hooks', 'Hooks', !leftoverHooks && registered === 0 ? 'pass' : 'warn', leftoverHooks || registered ? `legacy CCG hooks present (${registered} registered); run ccg init to remove` : 'no per-turn hooks'),
+    check('claude.rules', 'Rules', 'pass', `${rules.length} CCG rules installed`),
   ]
 }
 

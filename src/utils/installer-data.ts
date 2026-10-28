@@ -34,24 +34,11 @@ function cmd(
 }
 
 // ═══════════════════════════════════════════════════════
-// V3 Core commands (always installed)
+// V3 Core commands (always installed) — slim fork keeps only the OpenSpec chain
 // Source: templates/commands/
 // ═══════════════════════════════════════════════════════
 
 const CORE_CONFIGS: WorkflowConfig[] = [
-  // ── Smart Entry ──────────────────────────────────────
-  cmd('go', 0, 'development', 'CCG 智能入口', 'CCG Smart Entry', '描述你要做什么，AI 自动选择最佳策略执行', 'Describe what you want, AI picks the best strategy'),
-
-  // ── Independent Tools ────────────────────────────────
-  cmd('init-project', 10, 'init', '项目初始化', 'Project Init', '初始化项目 AI 上下文，生成 CLAUDE.md', 'Initialize project AI context, generate CLAUDE.md', 'init'),
-  cmd('context', 11, 'development', '项目上下文管理', 'Project Context Manager', '初始化 .context 目录、记录决策日志、压缩归档、查看历史', 'Init .context dir, log decisions, compress, view history'),
-
-  // ── Git ──────────────────────────────────────────────
-  cmd('commit', 20, 'git', 'Git 提交', 'Git Commit', '智能生成 conventional commit 信息', 'Smart conventional commit message generation'),
-  cmd('rollback', 21, 'git', 'Git 回滚', 'Git Rollback', '交互式回滚分支到历史版本', 'Interactive rollback to historical version'),
-  cmd('clean-branches', 22, 'git', 'Git 清理分支', 'Git Clean Branches', '安全清理已合并或过期分支', 'Safely clean merged or stale branches'),
-  cmd('worktree', 23, 'git', 'Git Worktree', 'Git Worktree', '管理 Git worktree', 'Manage Git worktree'),
-
   // ── Spec (OpenSpec / OPSX) ───────────────────────────
   cmd('spec-init', 30, 'spec', 'OpenSpec 初始化', 'OpenSpec Init', '初始化 OpenSpec 环境 + 验证多模型 MCP 工具', 'Initialize OpenSpec environment with multi-model MCP validation'),
   cmd('spec-research', 31, 'spec', '需求研究', 'Spec Research', '需求 → 约束集（并行探索 + OpenSpec 提案）', 'Transform requirements into constraint sets via parallel exploration'),

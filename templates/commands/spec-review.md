@@ -9,7 +9,8 @@ description: '双模型交叉审查（独立工具，随时可用）'
 - This is an independent review tool—can be used anytime, not tied to archive workflow.
 
 **Guardrails**
-- **MANDATORY**: Both {{BACKEND_PRIMARY}} AND {{FRONTEND_PRIMARY}} must complete review before synthesis.
+- {{BACKEND_PRIMARY}} review is mandatory; {{FRONTEND_PRIMARY}} reviews only frontend/UI changes.
+- Reviewers run in fresh sessions, never the session that wrote the code.
 - Review scope is strictly limited to the proposal's changes—no scope creep.
 - Refer to `openspec/config.yaml` for project conventions when reviewing OpenSpec proposals.
 
@@ -25,47 +26,42 @@ description: '双模型交叉审查（独立工具，随时可用）'
    - Load relevant spec constraints and PBT properties from `openspec/changes/<id>/specs/`.
 
 3. **Multi-Model Review (PARALLEL)**
-   - **CRITICAL**: You MUST launch BOTH {{BACKEND_PRIMARY}} AND {{FRONTEND_PRIMARY}} in a SINGLE message with TWO Bash tool calls.
-   - **DO NOT** call one model first and wait. Launch BOTH simultaneously with `run_in_background: true`.
+   - {{BACKEND_PRIMARY}} is required. Add {{FRONTEND_PRIMARY}} only when the change touches frontend/UI code or the user asks for a second opinion. When both run, launch them in ONE message with `run_in_background: true`.
    - **工作目录**：`{{WORKDIR}}` **必须通过 Bash 执行 `pwd`（Unix）或 `cd`（Windows CMD）获取当前工作目录的绝对路径**，禁止从 `$HOME` 或环境变量推断。如果用户通过 `/add-dir` 添加了多个工作区，先确定任务相关的工作区。
 
-   **Step 3.1**: In ONE message, make TWO parallel Bash calls:
+   **Step 3.1**: Launch the calls below in ONE message:
 
    **FIRST Bash call ({{BACKEND_PRIMARY}})**:
    ```
    Bash({
-     command: "~/.claude/bin/codeagent-wrapper --progress --backend {{BACKEND_PRIMARY}} {{GEMINI_MODEL_FLAG}}{{GROK_MODEL_FLAG}}{{KIMI_MODEL_FLAG}}{{OPENCODE_MODEL_FLAG}}- \"{{WORKDIR}}\" <<'EOF'\nReview proposal <proposal_id> implementation:\n\n## {{BACKEND_PRIMARY}} Review Dimensions\n1. **Spec Compliance**: Verify ALL constraints from spec are satisfied\n2. **PBT Properties**: Check invariants, idempotency, bounds are correctly implemented\n3. **Logic Correctness**: Edge cases, error handling, algorithm correctness\n4. **Backend Security**: Injection vulnerabilities, auth checks, input validation\n5. **Regression Risk**: Interface compatibility, type safety, breaking changes\n\n## Output Format (JSON)\n{\n  \"findings\": [\n    {\n      \"severity\": \"Critical|Warning|Info\",\n      \"dimension\": \"spec_compliance|pbt|logic|security|regression\",\n      \"file\": \"path/to/file.ts\",\n      \"line\": 42,\n      \"description\": \"What is wrong\",\n      \"constraint_violated\": \"Constraint ID from spec (if applicable)\",\n      \"fix_suggestion\": \"How to fix\"\n    }\n  ],\n  \"passed_checks\": [\"List of verified constraints/properties\"],\n  \"summary\": \"Overall assessment\"\n}\nEOF",
+     command: "~/.claude/bin/codeagent-wrapper --progress --backend {{BACKEND_PRIMARY}} {{GEMINI_MODEL_FLAG}}{{GROK_MODEL_FLAG}}{{KIMI_MODEL_FLAG}}{{OPENCODE_MODEL_FLAG}}- \"{{WORKDIR}}\" <<'EOF'\nReview proposal <proposal_id> implementation:\n\n## {{BACKEND_PRIMARY}} Review Dimensions\n1. **Spec Compliance**: Verify ALL constraints from spec are satisfied\n2. **PBT Properties**: Check invariants, idempotency, bounds are correctly implemented\n3. **Logic Correctness**: Edge cases, error handling, algorithm correctness\n4. **Backend Security**: Injection vulnerabilities, auth checks, input validation\n5. **Regression Risk**: Callers broken by changed signatures or behavior\n\n## Rules\n- Read callers of every changed function and the tests, not only the diff.\n- Every finding needs a concrete case: this input or state leads to this wrong result. No case, no finding.\n- No style taste, no vague worries. Propose the smallest fix.\n\n## Output Format (JSON)\n{\n  \"findings\": [\n    {\n      \"severity\": \"Critical|Warning|Info\",\n      \"dimension\": \"spec_compliance|pbt|logic|security|regression\",\n      \"file\": \"path/to/file.ts\",\n      \"line\": 42,\n      \"description\": \"What is wrong\",\n      \"constraint_violated\": \"Constraint ID from spec (if applicable)\",\n      \"fix_suggestion\": \"How to fix\"\n    }\n  ],\n  \"passed_checks\": [\"List of verified constraints/properties\"],\n  \"summary\": \"Overall assessment\"\n}\nEOF",
      run_in_background: true,
      timeout: 300000,
      description: "{{BACKEND_PRIMARY}}: backend/logic review"
    })
    ```
 
-   **SECOND Bash call ({{FRONTEND_PRIMARY}}) - IN THE SAME MESSAGE**:
+   **OPTIONAL SECOND Bash call ({{FRONTEND_PRIMARY}}) — frontend/UI scope only, same message**:
    ```
    Bash({
-     command: "~/.claude/bin/codeagent-wrapper --progress --backend {{FRONTEND_PRIMARY}} {{GEMINI_MODEL_FLAG}}{{GROK_MODEL_FLAG}}{{KIMI_MODEL_FLAG}}{{OPENCODE_MODEL_FLAG}}- \"{{WORKDIR}}\" <<'EOF'\nReview proposal <proposal_id> implementation:\n\n## {{FRONTEND_PRIMARY}} Review Dimensions\n1. **Pattern Consistency**: Naming conventions, code style, project patterns\n2. **Maintainability**: Readability, complexity, documentation adequacy\n3. **Integration Risk**: Dependency changes, cross-module impacts\n4. **Frontend Security**: XSS, CSRF, sensitive data exposure\n5. **Spec Alignment**: Implementation matches spec intent (not just letter)\n\n## Output Format (JSON)\n{\n  \"findings\": [\n    {\n      \"severity\": \"Critical|Warning|Info\",\n      \"dimension\": \"patterns|maintainability|integration|security|alignment\",\n      \"file\": \"path/to/file.ts\",\n      \"line\": 42,\n      \"description\": \"What is wrong\",\n      \"spec_reference\": \"Spec section (if applicable)\",\n      \"fix_suggestion\": \"How to fix\"\n    }\n  ],\n  \"passed_checks\": [\"List of verified aspects\"],\n  \"summary\": \"Overall assessment\"\n}\nEOF",
+     command: "~/.claude/bin/codeagent-wrapper --progress --backend {{FRONTEND_PRIMARY}} {{GEMINI_MODEL_FLAG}}{{GROK_MODEL_FLAG}}{{KIMI_MODEL_FLAG}}{{OPENCODE_MODEL_FLAG}}- \"{{WORKDIR}}\" <<'EOF'\nReview proposal <proposal_id> implementation:\n\n## {{FRONTEND_PRIMARY}} Review Dimensions\n1. **UI Correctness**: Broken loading/empty/error states, wrong data shown\n2. **Accessibility**: Keyboard, focus, labels, contrast\n3. **Integration Risk**: Cross-module impacts, dependency changes\n4. **Frontend Security**: XSS, CSRF, sensitive data exposure\n5. **Spec Alignment**: Implementation matches spec intent (not just letter)\n\n## Rules\n- Read callers of every changed function and the tests, not only the diff.\n- Every finding needs a concrete case: this input or state leads to this wrong result. No case, no finding.\n- No style taste, no vague worries. Propose the smallest fix.\n\n## Output Format (JSON)\n{\n  \"findings\": [\n    {\n      \"severity\": \"Critical|Warning|Info\",\n      \"dimension\": \"ui|a11y|integration|security|alignment\",\n      \"file\": \"path/to/file.ts\",\n      \"line\": 42,\n      \"description\": \"What is wrong\",\n      \"spec_reference\": \"Spec section (if applicable)\",\n      \"fix_suggestion\": \"How to fix\"\n    }\n  ],\n  \"passed_checks\": [\"List of verified aspects\"],\n  \"summary\": \"Overall assessment\"\n}\nEOF",
      run_in_background: true,
      timeout: 300000,
      description: "{{FRONTEND_PRIMARY}}: patterns/integration review"
    })
    ```
 
-   **Step 3.2**: After BOTH Bash calls return task IDs, wait for results with TWO TaskOutput calls:
-   ```
-   TaskOutput({ task_id: "<codex_task_id>", block: true, timeout: 600000 })
-   TaskOutput({ task_id: "<gemini_task_id>", block: true, timeout: 600000 })
-   ```
+   **Step 3.2**: Wait for every launched call to finish before synthesizing.
 
-   ⛔ **前端模型失败必须重试**：若前端模型调用失败，最多重试 2 次（间隔 5 秒）。3 次全败才跳过。
-   ⛔ **后端模型结果必须等待**：后端模型执行 5-15 分钟属正常，超时后继续轮询，禁止跳过。
+   - 后台调用完成时会自动通知，不要轮询。后端模型常需 5-15 分钟；超过 timeout 就报告用户，不要无限等待。
+   - 前端模型失败：说明原因，用后端结果继续，不重试。
 
 4. **Synthesize Findings**
    - Merge findings from both models.
    - Deduplicate overlapping issues.
    - Classify by severity:
      * **Critical**: Spec violation, security vulnerability, breaking change → MUST fix
-     * **Warning**: Pattern deviation, maintainability concern → SHOULD fix
+     * **Warning**: Risky logic without a test, real slowness, duplicated logic → SHOULD fix
      * **Info**: Minor improvement suggestion → MAY fix
 
 5. **Present Review Report**
@@ -78,10 +74,10 @@ description: '双模型交叉审查（独立工具，随时可用）'
    - [ ] [SEC] api.ts:15 - SQL injection vulnerability
 
    ### Warning (Y issues) - SHOULD FIX
-   - [ ] [PATTERN] utils.ts:88 - Inconsistent naming convention
+   - [ ] [TEST] utils.ts:88 - New retry branch has no failing test
 
    ### Info (Z issues) - MAY FIX
-   - [ ] [MAINT] helper.ts:20 - Consider extracting to separate function
+   - [ ] [PERF] helper.ts:20 - Recomputes the index on every call
 
    ### Passed Checks
    - ✅ PBT: Idempotency property verified
@@ -105,13 +101,10 @@ description: '双模型交叉审查（独立工具，随时可用）'
      * Re-run affected review dimension.
      * Repeat until Critical = 0.
 
-8. **Context Checkpoint**
-   - Report current context usage.
-   - If approaching 80K tokens, suggest: "Run `/clear` and continue with `/ccg:spec-review` or `/ccg:spec-impl`"
 
 **Exit Criteria**
 Review is complete when:
-- [ ] Both {{BACKEND_PRIMARY}} and {{FRONTEND_PRIMARY}} reviews completed
+- [ ] Required reviews completed
 - [ ] All findings synthesized and classified
 - [ ] Zero Critical issues remain (fixed or user-acknowledged)
 - [ ] User decision captured (archive / return to impl / defer)

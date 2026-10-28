@@ -10,8 +10,6 @@ import { installSkills } from '../../utils/skill-manager'
 
 let home: string
 let exec: ReturnType<typeof vi.fn>
-const hookFiles = ['task-utils.js', 'workflow-state.js', 'session-start.js', 'subagent-context.js', 'skill-router.js']
-const hookEvents = { UserPromptSubmit: ['workflow-state.js', 'skill-router.js'], SessionStart: ['session-start.js'], PreToolUse: ['subagent-context.js'] }
 function deps(extra: DoctorDependencies = {}): DoctorDependencies {
   return { home, nodeVersion: 'v22.0.0', platform: 'darwin', exec, ...extra }
 }
@@ -22,12 +20,9 @@ async function config(frontend = 'claude', backend = 'claude', review = ['claude
   }))
 }
 async function claudeInstall() {
-  await fs.outputFile(join(home, '.claude', 'commands', 'ccg.md'), '# CCG')
-  for (const name of hookFiles) await fs.outputFile(join(home, '.claude', 'hooks', 'ccg', name), '// hook')
-  const hooks = Object.fromEntries(Object.entries(hookEvents).map(([event, names]) => [event, [{ hooks: names.map(name => ({ type: 'command', command: `node "${join(home, '.claude', 'hooks', 'ccg', name)}"` })) }]]))
-  await fs.outputJSON(join(home, '.claude', 'settings.json'), { hooks, env: { SECRET_TOKEN: 'super-secret-value' } })
-  await fs.outputFile(join(home, '.claude', 'rules', 'ccg-skills.md'), 'rule')
-  await fs.outputFile(join(home, '.claude', 'rules', 'ccg-engine.md'), 'rule')
+  await fs.outputFile(join(home, '.claude', 'commands', 'ccg', 'spec-plan.md'), '# CCG')
+  await fs.outputJSON(join(home, '.claude', 'settings.json'), { env: { SECRET_TOKEN: 'super-secret-value' } })
+  await fs.outputFile(join(home, '.claude', 'rules', 'ccg-codegraph.md'), 'rule')
 }
 async function codexInstall() {
   await fs.outputFile(join(home, '.codex', '.ccg-version'), '3.6.8')
@@ -144,16 +139,14 @@ describe('CCG doctor inventory', () => {
     expect(JSON.stringify(malformed)).not.toContain('secret-token')
   })
 
-  it('requires all five named scripts and all four expected event handlers', async () => {
+  it('passes without hooks and warns about hooks left by a full install', async () => {
     await config()
     await claudeInstall()
-    await fs.remove(join(home, '.claude', 'hooks', 'ccg', 'task-utils.js'))
-    await fs.outputFile(join(home, '.claude', 'hooks', 'ccg', 'unrelated.js'), '// not a replacement')
-    const report = await collectDoctorReport(deps())
-    expect(report.checks.find(c => c.id === 'claude.hooks')).toMatchObject({ status: 'fail', detail: '4/5 scripts; missing: task-utils.js' })
-    await fs.outputJSON(join(home, '.claude', 'settings.json'), { hooks: { UserPromptSubmit: [{ hooks: [{ type: 'command', command: 'node /wrong/hooks/ccg/skill-router.js' }] }] } })
-    const invalid = await collectDoctorReport(deps())
-    expect(invalid.checks.find(c => c.id === 'claude.hook-registration')).toMatchObject({ status: 'fail', detail: '0/4 handlers across 3 events in settings.json' })
+    const clean = await collectDoctorReport(deps())
+    expect(clean.checks.find(c => c.id === 'claude.hooks')).toMatchObject({ status: 'pass', detail: 'no per-turn hooks' })
+    await fs.outputJSON(join(home, '.claude', 'settings.json'), { hooks: { UserPromptSubmit: [{ hooks: [{ type: 'command', command: `node "${join(home, '.claude', 'hooks', 'ccg', 'skill-router.js')}"` }] }] } })
+    const stale = await collectDoctorReport(deps())
+    expect(stale.checks.find(c => c.id === 'claude.hooks')).toMatchObject({ status: 'warn', detail: 'legacy CCG hooks present (1 registered); run ccg init to remove' })
   })
 
   it('outputs standalone JSON without ANSI or secrets and sets nonzero failure exit code', async () => {
@@ -169,7 +162,7 @@ describe('CCG doctor inventory', () => {
     expect(text).not.toContain('super-secret-value')
     expect(healthy.schemaVersion).toBe(1)
     expect(setExitCode).toHaveBeenLastCalledWith(0)
-    await fs.remove(join(home, '.claude', 'settings.json'))
+    await fs.remove(join(home, '.claude', 'commands', 'ccg'))
     await doctor({ json: true }, deps({ output, setExitCode }))
     expect(setExitCode).toHaveBeenLastCalledWith(1)
   })

@@ -1,6 +1,6 @@
 # Antigravity Role: Test Engineer
 
-> For: /ccg:go test generation phases
+> For: /ccg:spec-* phases
 
 You are a senior test engineer powered by Antigravity (Gemini 3.5 Flash).
 

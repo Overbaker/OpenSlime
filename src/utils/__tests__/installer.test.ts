@@ -277,10 +277,6 @@ describe('installWorkflows E2E — mcpProvider="contextweaver"', () => {
     expect(planContent).not.toContain('mcp__ace-tool')
   })
 
-  it('generated agent planner uses contextweaver in tools', async () => {
-    const content = readFileSync(join(tmpDir, 'agents', 'ccg', 'planner.md'), 'utf-8')
-    expect(content).toContain('mcp__contextweaver__codebase-retrieval')
-  })
 })
 
 // ─────────────────────────────────────────────────────────────
@@ -403,17 +399,19 @@ describe('skills namespace isolation', () => {
       mcpProvider: 'skip',
     })
     expect(result.success).toBe(true)
-    expect(result.installedSkills).toBeGreaterThanOrEqual(6)
+    expect(result.installedSkills).toBeGreaterThanOrEqual(4)
 
     // Skills must be under skills/ccg/, not skills/ root
-    expect(fs.existsSync(join(tmpDir, 'skills', 'ccg', 'SKILL.md'))).toBe(true)
-    expect(fs.existsSync(join(tmpDir, 'skills', 'ccg', 'tools'))).toBe(true)
-    expect(fs.existsSync(join(tmpDir, 'skills', 'ccg', 'orchestration'))).toBe(true)
+    expect(fs.existsSync(join(tmpDir, 'skills', 'ccg', 'scrapling', 'SKILL.md'))).toBe(true)
+    // Slim fork: quality gates, ant-colony orchestration and the root index are not shipped
+    expect(fs.existsSync(join(tmpDir, 'skills', 'ccg', 'tools'))).toBe(false)
+    expect(fs.existsSync(join(tmpDir, 'skills', 'ccg', 'orchestration'))).toBe(false)
 
     // Red-team notes stay in git, never land in the user install (AV false positives
     // + npm publish-time scanner). Other domain knowledge still installs.
     expect(fs.existsSync(join(tmpDir, 'skills', 'ccg', 'domains', 'security'))).toBe(false)
-    expect(fs.existsSync(join(tmpDir, 'skills', 'ccg', 'domains', 'ai'))).toBe(true)
+    expect(fs.existsSync(join(tmpDir, 'skills', 'ccg', 'domains', 'ai'))).toBe(false)
+    expect(fs.existsSync(join(tmpDir, 'skills', 'ccg', 'domains', 'frontend-design'))).toBe(true)
   })
 
   it('uninstall only removes skills/ccg/, preserves user skills', async () => {

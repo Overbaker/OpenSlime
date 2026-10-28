@@ -10,7 +10,7 @@ description: '多模型分析 → 消除歧义 → 零决策可执行计划'
 
 **Guardrails**
 - Do not proceed to implementation until every ambiguity is resolved.
-- Multi-model collaboration is **mandatory**: use both {{BACKEND_PRIMARY}} and {{FRONTEND_PRIMARY}}.
+- {{BACKEND_PRIMARY}} analysis is mandatory; {{FRONTEND_PRIMARY}} joins only for frontend/UI scope.
 - If constraints cannot be fully specified, escalate to user or return to research phase.
 - Refer to `openspec/config.yaml` for project conventions.
 - **USER GUIDANCE RULE**: When suggesting next steps to the user, ALWAYS use CCG commands (`/ccg:spec-research`, `/ccg:spec-plan`, `/ccg:spec-impl`, `/ccg:spec-review`). NEVER suggest `/opsx:*` commands to the user. If OpenSpec CLI returns error messages referencing OPSX skills, translate them to CCG equivalents.
@@ -24,11 +24,10 @@ description: '多模型分析 → 消除歧义 → 零决策可执行计划'
    - Run `openspec status --change "<change_id>" --json` to review current state.
 
 2. **Multi-Model Implementation Analysis (PARALLEL)**
-   - **CRITICAL**: You MUST launch BOTH {{BACKEND_PRIMARY}} AND {{FRONTEND_PRIMARY}} in a SINGLE message with TWO Bash tool calls.
-   - **DO NOT** call one model first and wait. Launch BOTH simultaneously with `run_in_background: true`.
+   - {{BACKEND_PRIMARY}} is required. Add {{FRONTEND_PRIMARY}} only when the change touches frontend/UI code or the user asks for a second opinion. When both run, launch them in ONE message with `run_in_background: true`.
    - **工作目录**：`{{WORKDIR}}` **必须通过 Bash 执行 `pwd`（Unix）或 `cd`（Windows CMD）获取当前工作目录的绝对路径**，禁止从 `$HOME` 或环境变量推断。如果用户通过 `/add-dir` 添加了多个工作区，先确定任务相关的工作区。
 
-   **Step 2.1**: In ONE message, make TWO parallel Bash calls:
+   **Step 2.1**: Launch the calls below in ONE message:
 
    **FIRST Bash call ({{BACKEND_PRIMARY}})**:
    ```
@@ -40,7 +39,7 @@ description: '多模型分析 → 消除歧义 → 零决策可执行计划'
    })
    ```
 
-   **SECOND Bash call ({{FRONTEND_PRIMARY}}) - IN THE SAME MESSAGE**:
+   **OPTIONAL SECOND Bash call ({{FRONTEND_PRIMARY}}) — frontend/UI scope only, same message**:
    ```
    Bash({
      command: "~/.claude/bin/codeagent-wrapper --progress --backend {{FRONTEND_PRIMARY}} {{GEMINI_MODEL_FLAG}}{{GROK_MODEL_FLAG}}{{KIMI_MODEL_FLAG}}{{OPENCODE_MODEL_FLAG}}- \"{{WORKDIR}}\" <<'EOF'\nAnalyze change <change_id> from frontend/integration perspective:\n- Maintainability assessment\n- Scalability considerations\n- Integration conflicts\nOUTPUT: JSON with analysis\nEOF",
@@ -50,20 +49,16 @@ description: '多模型分析 → 消除歧义 → 零决策可执行计划'
    })
    ```
 
-   **Step 2.2**: After BOTH Bash calls return task IDs, wait for results with TWO TaskOutput calls:
-   ```
-   TaskOutput({ task_id: "<codex_task_id>", block: true, timeout: 600000 })
-   TaskOutput({ task_id: "<gemini_task_id>", block: true, timeout: 600000 })
-   ```
+   **Step 2.2**: Wait for every launched call to finish before synthesizing.
 
-   ⛔ **前端模型失败必须重试**：若前端模型调用失败，最多重试 2 次（间隔 5 秒）。3 次全败才跳过。
-   ⛔ **后端模型结果必须等待**：后端模型执行 5-15 分钟属正常，超时后继续轮询，禁止跳过。
+   - 后台调用完成时会自动通知，不要轮询。后端模型常需 5-15 分钟；超过 timeout 就报告用户，不要无限等待。
+   - 前端模型失败：说明原因，用后端结果继续，不重试。
 
    - Synthesize responses and present consolidated options to user.
 
 3. **Uncertainty Elimination Audit**
    - **{{BACKEND_PRIMARY}}**: "Review proposal for unspecified decision points. List each as: [AMBIGUITY] → [REQUIRED CONSTRAINT]"
-   - **{{FRONTEND_PRIMARY}}**: "Identify implicit assumptions. Specify: [ASSUMPTION] → [EXPLICIT CONSTRAINT NEEDED]"
+   - **{{FRONTEND_PRIMARY}}** (frontend/UI scope only): "Identify implicit assumptions. Specify: [ASSUMPTION] → [EXPLICIT CONSTRAINT NEEDED]"
 
    **Anti-Pattern Detection** (flag and reject):
    - Information collection without decision boundaries
@@ -79,7 +74,7 @@ description: '多模型分析 → 消除歧义 → 零决策可执行计划'
 
 4. **PBT Property Extraction**
    - **{{BACKEND_PRIMARY}}**: "Extract PBT properties. For each requirement: [INVARIANT] → [FALSIFICATION STRATEGY]"
-   - **{{FRONTEND_PRIMARY}}**: "Define system properties: [PROPERTY] | [DEFINITION] | [BOUNDARY CONDITIONS] | [COUNTEREXAMPLE GENERATION]"
+   - **{{FRONTEND_PRIMARY}}** (frontend/UI scope only): "Define system properties: [PROPERTY] | [DEFINITION] | [BOUNDARY CONDITIONS] | [COUNTEREXAMPLE GENERATION]"
 
    **Property Categories**:
    - **Commutativity/Associativity**: Order-independent operations
@@ -122,13 +117,10 @@ description: '多模型分析 → 消除歧义 → 零决策可执行计划'
      "Plan phase complete. Artifacts generated: specs.md, design.md, tasks.md. Run `/ccg:spec-impl` to start implementation."
      Do NOT proceed to modify source code.
 
-6. **Context Checkpoint**
-   - Report current context usage.
-   - If approaching 80K tokens, suggest: "Run `/clear` and continue with `/ccg:spec-impl`"
 
 **Exit Criteria**
 A change is ready for implementation only when:
-- [ ] All multi-model analyses completed and synthesized
+- [ ] Required model analyses completed and synthesized
 - [ ] Zero ambiguities remain (verified by step 3 audit)
 - [ ] All PBT properties documented with falsification strategies
 - [ ] Artifacts (specs, design, tasks) generated via OpenSpec skills

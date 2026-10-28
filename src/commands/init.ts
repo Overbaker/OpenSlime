@@ -273,7 +273,6 @@ export async function init(options: InitOptions = {}): Promise<void> {
     ...(options.installDir ? { nativeDir: join(options.installDir, 'skills'), storeDir: join(options.installDir, '.ccg-skills') } : {}),
   })
   const skillCatalog = getSkillCatalog(skillPaths)
-  const coreSkills = ['gen-docs', 'verify-security', 'verify-quality', 'verify-change', 'verify-module', 'multi-agent']
   const requestedSkills = options.skills === undefined
     ? undefined
     : options.skills.split(',').map(name => name.trim()).filter(Boolean)
@@ -846,14 +845,14 @@ export async function init(options: InitOptions = {}): Promise<void> {
 
       liteMode = perfMode === 'lite'
 
-      // Version mode: v3 (smart entry + engine) or legacy (all 30 commands)
+      // Version mode: v3 (OpenSpec chain) or legacy (adds the optional legacy commands)
       const { versionMode } = await inquirer.prompt([{
         type: 'list',
         name: 'versionMode',
         message: '安装模式',
         choices: [
-          { name: `${ansis.green('v3 新版')} — /ccg:go 智能入口 + Hook 引擎 + 12 核心命令（推荐）`, value: 'v3' },
-          { name: `${ansis.gray('旧版兼容')} — 新版全部 + 18 个旧版命令（workflow/debug/team 等）`, value: 'legacy' },
+          { name: `${ansis.green('v3 精简')} — OpenSpec 多模型串行链（spec-init/research/plan/impl/review，推荐）`, value: 'v3' },
+          { name: `${ansis.gray('旧版兼容')} — 精简版 + 18 个旧版命令（workflow/debug/team 等）`, value: 'legacy' },
         ],
         default: 'v3',
       }])
@@ -879,16 +878,12 @@ export async function init(options: InitOptions = {}): Promise<void> {
           message: language === 'zh-CN' ? '原生 Skills 安装方式' : 'Native Skills installation',
           choices: [
             { name: language === 'zh-CN' ? '保留兼容安装（原有 Skills 体系）' : 'Keep the legacy Skills installation', value: 'legacy' },
-            { name: language === 'zh-CN' ? '核心质量关卡 + 多 Agent（6 项）' : 'Core quality gates + multi-agent (6 skills)', value: 'core' },
             { name: language === 'zh-CN' ? '按需选择（可全部取消）' : 'Choose individual skills (can leave empty)', value: 'custom' },
           ],
           default: skillsProfile === undefined ? 'legacy' : 'custom',
         }])
         if (skillsMode === 'legacy') {
           skillsProfile = undefined
-        }
-        else if (skillsMode === 'core') {
-          skillsProfile = coreSkills.filter(name => skillCatalog.some(skill => skill.name === name))
         }
         else {
           const { selectedSkills } = await inquirer.prompt([{
@@ -1401,7 +1396,7 @@ export async function init(options: InitOptions = {}): Promise<void> {
     if (result.installedSkills && result.installedSkills > 0) {
       console.log()
       console.log(ansis.cyan('  Skills:'))
-      console.log(`    ${ansis.green('✓')} ${result.installedSkills} skills installed (quality gates + multi-agent)`)
+      console.log(`    ${ansis.green('✓')} ${result.installedSkills} skills installed (on-demand)`)
       console.log(ansis.gray('       → ~/.claude/skills/'))
     }
 
@@ -1409,8 +1404,8 @@ export async function init(options: InitOptions = {}): Promise<void> {
     if (result.installedRules) {
       console.log()
       console.log(ansis.cyan('  Rules:'))
-      console.log(`    ${ansis.green('✓')} quality gate auto-trigger rules`)
-      console.log(ansis.gray('       → ~/.claude/rules/ccg-skills.md'))
+      console.log(`    ${ansis.green('✓')} CCG rules`)
+      console.log(ansis.gray('       → ~/.claude/rules/'))
     }
 
     // Show errors if any

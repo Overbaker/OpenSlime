@@ -267,11 +267,6 @@ function showHelp(): void {
   const section = (title: string) => console.log(ansis.yellow.bold(`  ${title}`))
   const cmd = (name: string, desc: string) => console.log(`  ${ansis.green(name.padEnd(col1))} ${ansis.gray(desc)}`)
 
-  // Core Engine
-  section(i18n.t('menu:help.sections.engine'))
-  cmd('/ccg:go', i18n.t('menu:help.descriptions.go'))
-  console.log()
-
   // OpenSpec Workflows
   section(i18n.t('menu:help.sections.opsx'))
   cmd('/ccg:spec-init', i18n.t('menu:help.descriptions.specInit'))
@@ -279,28 +274,6 @@ function showHelp(): void {
   cmd('/ccg:spec-plan', i18n.t('menu:help.descriptions.specPlan'))
   cmd('/ccg:spec-impl', i18n.t('menu:help.descriptions.specImpl'))
   cmd('/ccg:spec-review', i18n.t('menu:help.descriptions.specReview'))
-  console.log()
-
-  // Git Tools
-  section(i18n.t('menu:help.sections.gitTools'))
-  cmd('/ccg:commit', i18n.t('menu:help.descriptions.commit'))
-  cmd('/ccg:rollback', i18n.t('menu:help.descriptions.rollback'))
-  cmd('/ccg:clean-branches', i18n.t('menu:help.descriptions.cleanBranches'))
-  cmd('/ccg:worktree', i18n.t('menu:help.descriptions.worktree'))
-  console.log()
-
-  // Project Management
-  section(i18n.t('menu:help.sections.projectMgmt'))
-  cmd('/ccg:init', i18n.t('menu:help.descriptions.init'))
-  cmd('/ccg:context', i18n.t('menu:help.descriptions.context'))
-  console.log()
-
-  // Quality Gates
-  section(i18n.t('menu:help.sections.qualityGates'))
-  cmd('/ccg:verify-security', i18n.t('menu:help.descriptions.verifySecurity'))
-  cmd('/ccg:verify-quality', i18n.t('menu:help.descriptions.verifyQuality'))
-  cmd('/ccg:verify-change', i18n.t('menu:help.descriptions.verifyChange'))
-  cmd('/ccg:verify-module', i18n.t('menu:help.descriptions.verifyModule'))
   console.log()
 
   console.log(ansis.gray(`  ${i18n.t('menu:help.hint')}`))

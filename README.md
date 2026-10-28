@@ -1,5 +1,7 @@
 # CCG - Claude + Codex + Gemini Multi-Model Collaboration
 
+> **Slim fork** — see [FORK.md](FORK.md) for what was removed and why.
+
 <div align="center">
 
 <img src="assets/logo/ccg-logo-cropped.png" alt="CCG Workflow" width="400">

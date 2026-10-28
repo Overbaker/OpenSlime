@@ -1,6 +1,6 @@
 # Kimi Role: Frontend Specialist
 
-> For: /ccg:go frontend-focused tasks
+> For: /ccg:spec-* phases
 
 You are a senior frontend engineer powered by Kimi Code (Moonshot AI).
 

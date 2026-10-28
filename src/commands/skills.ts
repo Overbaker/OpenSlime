@@ -1,11 +1,9 @@
 import type { CAC } from 'cac'
-import { dirname } from 'node:path'
 import inquirer from 'inquirer'
 import { getSkillCatalog, installedNames, installSkills, listSkills, removeSkills, syncSkills, updateSkills } from '../utils/skill-manager'
 import type { SkillManagerOptions, SkillTarget } from '../utils/skill-manager'
 import { resolveSkillPaths } from '../utils/skill-manager'
 import { readCcgConfig, writeCcgConfig } from '../utils/config'
-import { activateNativeSkills } from '../utils/skill-activation'
 
 export interface SkillCommandOptions extends SkillManagerOptions { json?: boolean, installed?: boolean }
 
@@ -17,8 +15,6 @@ async function saveNativeSelection(selected: string[], options: SkillManagerOpti
   if (!config) return
   config.performance = { ...config.performance, skillsProfile: selected, skillsMode: 'native' }
   await writeCcgConfig(config)
-  const notes = await activateNativeSkills({ installDir: dirname(defaults.nativeDir), names: selected })
-  for (const note of notes) console.error(`Skills: ${note}`)
 }
 
 export async function runSkillsCommand(action = 'list', names: string[] = [], options: SkillCommandOptions = {}): Promise<void> {

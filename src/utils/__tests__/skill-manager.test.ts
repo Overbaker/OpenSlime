@@ -199,29 +199,6 @@ describe('ownership, update and atomic boundaries', () => {
     expect(execFileSync(process.execPath, [join(base, 'scripts/check.js')], { encoding: 'utf8' })).toContain('dependency-ok')
     expect(await fs.readFile(join(base, 'SKILL.md'), 'utf8')).toContain(body)
   })
-  it('executes the real packaged quality checker using the facade resource root and shared library', async () => {
-    const templatesDir = join(__dirname, '../../../templates/skills')
-    await installSkills(['verify-quality'], { ...options, templatesDir })
-    const facade = await fs.readFile(join(options.nativeDir!, 'ccg-verify-quality/SKILL.md'), 'utf8')
-    const base = facade.match(/resources for this skill are in `([^`]+)`/)![1]
-    await fs.mkdir(join(root, 'scan'))
-    await fs.writeFile(join(root, 'scan', 'small.js'), 'const value = 1\n')
-    const result = JSON.parse(execFileSync(process.execPath, [join(base, 'scripts/quality_checker.js'), join(root, 'scan'), '--json'], { encoding: 'utf8' }))
-    expect(result.files_scanned).toBe(1)
-    expect(await fs.readdir(options.nativeDir!)).toEqual(['ccg-verify-quality'])
-  })
-  it('keeps CommonJS helper execution working when the cache is inside an ESM project', async () => {
-    await fs.writeFile(join(root, 'package.json'), '{"type":"module"}\n')
-    const templatesDir = join(__dirname, '../../../templates/skills')
-    await installSkills(['verify-quality'], { ...options, templatesDir })
-    const facade = await fs.readFile(join(options.nativeDir!, 'ccg-verify-quality/SKILL.md'), 'utf8')
-    const base = facade.match(/resources for this skill are in `([^`]+)`/)![1]
-    await fs.mkdir(join(root, 'esm-scan'))
-    await fs.writeFile(join(root, 'esm-scan', 'module.js'), 'export const value = 1\n')
-    const result = JSON.parse(execFileSync(process.execPath, [join(base, 'scripts/quality_checker.js'), join(root, 'esm-scan'), '--json'], { encoding: 'utf8' }))
-    expect(result.files_scanned).toBe(1)
-    expect((await listSkills({ ...options, templatesDir })).find(s => s.installed)?.healthy).toBe(true)
-  })
   it('preserves a source package declaration when the source supplies its own module boundary', async () => {
     await write('package.json', '{"type":"commonjs","name":"upstream-skill-assets"}\n')
     await installSkills(['quality'], options)

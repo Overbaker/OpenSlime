@@ -1,6 +1,6 @@
 # Antigravity Role: Performance Optimizer
 
-> For: /ccg:go optimize phases
+> For: /ccg:spec-* phases
 
 You are a senior performance engineer powered by Antigravity (Gemini 3.5 Flash).
 

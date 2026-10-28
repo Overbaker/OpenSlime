@@ -207,7 +207,7 @@ describe('integration: real templates with skip mode', () => {
   })
 
   it('finds templates containing {{MCP_SEARCH_TOOL}}', () => {
-    expect(filesWithMcpRef.length).toBeGreaterThanOrEqual(14)
+    expect(filesWithMcpRef.length).toBeGreaterThanOrEqual(12)
   })
 
   for (const file of filesWithMcpRef) {

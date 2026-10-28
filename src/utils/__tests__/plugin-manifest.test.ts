@@ -69,8 +69,8 @@ describe('npm tarball does not ship red-team notes', () => {
     const packed: string[] = JSON.parse(out)[0].files.map((f: { path: string }) => f.path)
     expect(packed.some(p => p.includes('templates/skills/domains/security'))).toBe(false)
     expect(packed.some(p => p.endsWith('red-team.md') || p.endsWith('pentest.md') || p.endsWith('vuln-research.md'))).toBe(false)
-    expect(packed).toContain('templates/skills/domains/ai/SKILL.md')
-    expect(packed).toContain('templates/skills/tools/verify-security/SKILL.md')
+    expect(packed).toContain('templates/skills/domains/seo/SKILL.md')
+    expect(packed).toContain('templates/skills/scrapling/SKILL.md')
   })
 })
 

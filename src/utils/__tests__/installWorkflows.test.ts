@@ -75,19 +75,6 @@ describe('installWorkflows E2E — mcpProvider="skip"', () => {
     }
   })
 
-  it('generated agent files contain no mcp__ace-tool references', async () => {
-    const agentDir = join(tmpDir, 'agents', 'ccg')
-    const files = collectMdFiles(agentDir)
-    expect(files.length).toBeGreaterThan(0)
-
-    for (const file of files) {
-      const content = readFileSync(file, 'utf-8')
-      const rel = file.replace(tmpDir + '/', '')
-      expect(content, `${rel} should not contain mcp__ace-tool`).not.toContain('mcp__ace-tool__search_context')
-      expect(content, `${rel} should not contain {{MCP_SEARCH_TOOL}}`).not.toContain('{{MCP_SEARCH_TOOL}}')
-    }
-  })
-
   it('plan.md contains Glob + Grep fallback guidance', async () => {
     const content = readFileSync(join(tmpDir, 'commands', 'ccg', 'plan.md'), 'utf-8')
     expect(content).toContain('Glob + Grep')
@@ -100,11 +87,6 @@ describe('installWorkflows E2E — mcpProvider="skip"', () => {
     expect(content).toContain('MCP 未配置')
   })
 
-  it('planner.md frontmatter has no MCP tool in tools declaration', async () => {
-    const content = readFileSync(join(tmpDir, 'agents', 'ccg', 'planner.md'), 'utf-8')
-    const toolsLine = content.split('\n').find(l => l.startsWith('tools:'))
-    expect(toolsLine).toBe('tools: Read, Write')
-  })
 })
 
 // ─────────────────────────────────────────────────────────────
@@ -132,9 +114,4 @@ describe('installWorkflows E2E — mcpProvider="ace-tool" (control)', () => {
     expect(planContent).not.toContain('{{MCP_SEARCH_TOOL}}')
   })
 
-  it('generated agent files contain mcp__ace-tool__search_context', async () => {
-    const plannerContent = readFileSync(join(tmpDir, 'agents', 'ccg', 'planner.md'), 'utf-8')
-    expect(plannerContent).toContain('mcp__ace-tool__search_context')
-    expect(plannerContent).not.toContain('{{MCP_SEARCH_TOOL}}')
-  })
 })
