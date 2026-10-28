@@ -1,10 +1,11 @@
 name: Wrapper
 
 # Only when the Go wrapper changes; OpenSlime ships it unmodified from upstream.
+# TestBackendRunCoverage is intermittent on GitHub runners (upstream code); rerun before debugging.
 on:
   push:
     branches: [main]
-    paths: ['codeagent-wrapper/**', '.github/workflows/wrapper.yml']
+    paths: ['codeagent-wrapper/**']
   pull_request:
     paths: ['codeagent-wrapper/**']
   workflow_dispatch:
