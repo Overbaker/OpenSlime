@@ -20,7 +20,7 @@ async function config(frontend = 'claude', backend = 'claude', review = ['claude
   }))
 }
 async function claudeInstall() {
-  await fs.outputFile(join(home, '.claude', 'commands', 'ccg', 'spec-plan.md'), '# CCG')
+  await fs.outputFile(join(home, '.claude', 'commands', 'osm', 'plan.md'), '# CCG')
   await fs.outputJSON(join(home, '.claude', 'settings.json'), { env: { SECRET_TOKEN: 'super-secret-value' } })
   await fs.outputFile(join(home, '.claude', 'rules', 'ccg-codegraph.md'), 'rule')
 }
@@ -162,7 +162,7 @@ describe('CCG doctor inventory', () => {
     expect(text).not.toContain('super-secret-value')
     expect(healthy.schemaVersion).toBe(1)
     expect(setExitCode).toHaveBeenLastCalledWith(0)
-    await fs.remove(join(home, '.claude', 'commands', 'ccg'))
+    await fs.remove(join(home, '.claude', 'commands', 'osm'))
     await doctor({ json: true }, deps({ output, setExitCode }))
     expect(setExitCode).toHaveBeenLastCalledWith(1)
   })

@@ -264,11 +264,11 @@ function showHelp(): void {
 
   // OpenSpec Workflows
   section(i18n.t('menu:help.sections.opsx'))
-  cmd('/ccg:spec-init', i18n.t('menu:help.descriptions.specInit'))
-  cmd('/ccg:spec-research', i18n.t('menu:help.descriptions.specResearch'))
-  cmd('/ccg:spec-plan', i18n.t('menu:help.descriptions.specPlan'))
-  cmd('/ccg:spec-impl', i18n.t('menu:help.descriptions.specImpl'))
-  cmd('/ccg:spec-review', i18n.t('menu:help.descriptions.specReview'))
+  cmd('/osm:init', i18n.t('menu:help.descriptions.specInit'))
+  cmd('/osm:research', i18n.t('menu:help.descriptions.specResearch'))
+  cmd('/osm:plan', i18n.t('menu:help.descriptions.specPlan'))
+  cmd('/osm:impl', i18n.t('menu:help.descriptions.specImpl'))
+  cmd('/osm:review', i18n.t('menu:help.descriptions.specReview'))
   console.log()
 
   console.log(ansis.gray(`  ${i18n.t('menu:help.hint')}`))
@@ -975,7 +975,7 @@ async function uninstall(): Promise<void> {
       console.log()
       console.log(ansis.cyan(`  ${i18n.t('menu:uninstall.removedCommands')}`))
       for (const cmd of result.removedCommands) {
-        console.log(`    ${ansis.gray('•')} /ccg:${cmd}`)
+        console.log(`    ${ansis.gray('•')} /osm:${cmd}`)
       }
     }
 

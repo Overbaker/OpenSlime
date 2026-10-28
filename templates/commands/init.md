@@ -3,7 +3,7 @@ description: '初始化 OpenSpec (OPSX) 环境 + 验证多模型 MCP 工具'
 ---
 <!-- CCG:SPEC:INIT:START -->
 **Core Philosophy**
-- OPSX provides the specification framework; CCG adds multi-model collaboration.
+- OPSX provides the specification framework; OpenSlime adds multi-model collaboration.
 - This phase ensures all tools are ready before any development work begins.
 - Fail fast: detect missing dependencies early rather than mid-workflow.
 
@@ -84,18 +84,18 @@ description: '初始化 OpenSpec (OPSX) 环境 + 验证多模型 MCP 工具'
    {{FRONTEND_PRIMARY}} backend            ✓/✗
    ```
 
-   **Next Steps (Use CCG Encapsulated Commands)**
-   1. Start Research: `/ccg:spec-research "description"`
-   2. Plan & Design: `/ccg:spec-plan`
-   3. Implement: `/ccg:spec-impl` (Includes auto-review & archive)
+   **Next Steps (Use /osm:* Commands)**
+   1. Start Research: `/osm:research "description"`
+   2. Plan & Design: `/osm:plan`
+   3. Implement: `/osm:impl` (Includes auto-review & archive)
 
    **Standalone Tools (Available Anytime)**
-   - Code Review: `/ccg:spec-review` (Independent dual-model review)
+   - Code Review: `/osm:review` (Independent dual-model review)
 
 **Reference**
 - OpenSpec (OPSX) CLI: `npx @fission-ai/openspec --help`
 - Profile Management: `openspec config profile`
-- CCG Workflow: `npx ccg-workflow`
+- OpenSlime: https://gitea.aimo3d.org/han/OpenSlime (do not run `npx ccg-workflow`)
 - 后端/前端模型 MCP: Bundled with codeagent-wrapper
 - Node.js >= 18.x required for OpenSpec
 <!-- CCG:SPEC:INIT:END -->

@@ -23,7 +23,7 @@ const paths = (root: string) => ({ target: 'claude' as const, nativeDir: join(ro
 describe('native skill integration', () => {
   it('installs only the selected native entry without routing rules, and uninstalls its alias', async () => {
     const root = await setup()
-    const result = await installWorkflows(['spec-plan'], root, true, {
+    const result = await installWorkflows(['plan'], root, true, {
       skillsProfile: ['scrapling'], mcpProvider: 'skip',
       routing: { frontend: { primary: 'grok' }, backend: { primary: 'opencode' }, opencodeModel: 'deepseek/model-example' },
     })
@@ -47,8 +47,8 @@ describe('native skill integration', () => {
 
   it('explicit compatibility mode disables managed aliases and preserves their cache', async () => {
     const root = await setup()
-    await installWorkflows(['spec-plan'], root, true, { skillsProfile: ['scrapling'], mcpProvider: 'skip' })
-    const result = await installWorkflows(['spec-plan'], root, true, { skillsMode: 'legacy', mcpProvider: 'skip' })
+    await installWorkflows(['plan'], root, true, { skillsProfile: ['scrapling'], mcpProvider: 'skip' })
+    const result = await installWorkflows(['plan'], root, true, { skillsMode: 'legacy', mcpProvider: 'skip' })
     expect(result.success).toBe(true)
     expect(await installedNames(paths(root))).toEqual([])
     expect(await fs.pathExists(join(root, 'skills', 'ccg-scrapling'))).toBe(false)
@@ -61,7 +61,7 @@ describe('native skill integration', () => {
     await fs.ensureDir(join(root, 'skills', 'ccg-scrapling'))
     const userFile = join(root, 'skills', 'ccg-scrapling', 'SKILL.md')
     await fs.writeFile(userFile, 'user-owned')
-    const result = await installWorkflows(['spec-plan'], root, true, { skillsProfile: ['scrapling'], mcpProvider: 'skip' })
+    const result = await installWorkflows(['plan'], root, true, { skillsProfile: ['scrapling'], mcpProvider: 'skip' })
     expect(result.success).toBe(false)
     expect(result.errors.join('\n')).toMatch(/conflict|ownership|preserved/i)
     expect(await fs.readFile(userFile, 'utf8')).toBe('user-owned')
@@ -87,12 +87,12 @@ describe('native skill integration', () => {
         { type: 'command', command: 'echo shared' },
       ] }],
     } })
-    const result = await installWorkflows(['spec-plan'], root, true, { skillsProfile: [], mcpProvider: 'skip' })
+    const result = await installWorkflows(['plan'], root, true, { skillsProfile: [], mcpProvider: 'skip' })
     expect(result.success).toBe(true)
-    for (const rel of ['hooks/ccg', 'rules/ccg-skills.md', 'rules/ccg-skill-routing.md', 'commands/ccg/go.md', '.ccg/engine'])
+    for (const rel of ['hooks/ccg', 'rules/ccg-skills.md', 'rules/ccg-skill-routing.md', 'commands/ccg', '.ccg/engine'])
       expect(await fs.pathExists(join(root, rel))).toBe(false)
     expect(await fs.pathExists(join(root, 'rules', 'my-rule.md'))).toBe(true)
-    expect(await fs.pathExists(join(root, 'commands', 'ccg', 'spec-plan.md'))).toBe(true)
+    expect(await fs.pathExists(join(root, 'commands', 'osm', 'plan.md'))).toBe(true)
     expect((await fs.readJson(join(root, 'settings.json'))).hooks).toEqual({
       UserPromptSubmit: [{ hooks: [{ type: 'command', command: 'echo mine' }] }],
       SessionStart: [{ matcher: 'startup', hooks: [{ type: 'command', command: 'echo shared' }] }],

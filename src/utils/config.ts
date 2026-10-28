@@ -61,7 +61,7 @@ export function createDefaultConfig(options: {
       installed: options.installedWorkflows,
     },
     paths: {
-      commands: join(homedir(), '.claude', 'commands', 'ccg'),
+      commands: join(homedir(), '.claude', 'commands', 'osm'),
       prompts: join(CCG_DIR, 'prompts'), // v1.4.0: 移到配置目录
       backup: join(CCG_DIR, 'backup'),
     },

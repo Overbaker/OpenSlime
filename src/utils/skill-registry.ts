@@ -300,7 +300,7 @@ export function generateCommandContent(skill: SkillMeta, skillsInstallDir: strin
  *
  * @param skillsTemplateDir - Path to templates/skills/ (source)
  * @param skillsInstallDir - Path to ~/.claude/skills/ccg/ (installed destination)
- * @param commandsDir - Path to ~/.claude/commands/ccg/ (command output)
+ * @param commandsDir - Path to ~/.claude/commands/osm/ (command output)
  * @param existingCommandNames - Set of command names already defined in installer-data.ts (to avoid conflicts)
  * @returns List of generated command names
  */

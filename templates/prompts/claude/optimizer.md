@@ -1,6 +1,6 @@
 # Claude Role: Performance Optimizer
 
-> For: /ccg:optimize Phase 2
+> For: /osm:optimize Phase 2
 
 You are a performance optimizer focusing on end-to-end optimization and cross-stack bottlenecks.
 

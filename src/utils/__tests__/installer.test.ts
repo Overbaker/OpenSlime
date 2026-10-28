@@ -65,9 +65,8 @@ const LEGACY_TEMPLATES_DIR = join(PACKAGE_ROOT, 'templates', 'commands-legacy')
 // A. Workflow registry consistency
 // ─────────────────────────────────────────────────────────────
 describe('workflow registry', () => {
-  it('getAllCommandIds returns at least 20 commands', () => {
-    const ids = getAllCommandIds()
-    expect(ids.length).toBeGreaterThanOrEqual(20)
+  it('getAllCommandIds returns the /osm:* chain', () => {
+    expect(getAllCommandIds()).toEqual(['init', 'research', 'plan', 'impl', 'review'])
   })
 
   it('every command ID has a matching template file', () => {
@@ -271,7 +270,7 @@ describe('installWorkflows E2E — mcpProvider="contextweaver"', () => {
   }, 30_000)
 
   it('generated command files contain contextweaver references', async () => {
-    const planContent = readFileSync(join(tmpDir, 'commands', 'ccg', 'plan.md'), 'utf-8')
+    const planContent = readFileSync(join(tmpDir, 'commands', 'osm', 'research.md'), 'utf-8')
     expect(planContent).toContain('mcp__contextweaver__codebase-retrieval')
     expect(planContent).not.toContain('{{MCP_SEARCH_TOOL}}')
     expect(planContent).not.toContain('mcp__ace-tool')
@@ -297,7 +296,7 @@ describe('uninstallWorkflows E2E', () => {
     expect(installResult.success).toBe(true)
 
     // Verify files exist
-    expect(fs.existsSync(join(tmpDir, 'commands', 'ccg', 'workflow.md'))).toBe(true)
+    expect(fs.existsSync(join(tmpDir, 'commands', 'osm', 'plan.md'))).toBe(true)
 
     // Now uninstall
     const uninstallResult = await uninstallWorkflows(tmpDir)
@@ -305,7 +304,7 @@ describe('uninstallWorkflows E2E', () => {
     expect(uninstallResult.removedCommands.length).toBeGreaterThan(0)
 
     // Verify commands directory removed
-    expect(fs.existsSync(join(tmpDir, 'commands', 'ccg'))).toBe(false)
+    expect(fs.existsSync(join(tmpDir, 'commands', 'osm'))).toBe(false)
   })
 
   it('uninstall on empty dir succeeds without errors', async () => {
@@ -395,7 +394,7 @@ describe('skills namespace isolation', () => {
   })
 
   it('installs skills under skills/ccg/ namespace', { timeout: 30_000 }, async () => {
-    const result = await installWithFixture(['workflow'], tmpDir, true, {
+    const result = await installWithFixture(['plan'], tmpDir, true, {
       mcpProvider: 'skip',
     })
     expect(result.success).toBe(true)
@@ -452,7 +451,7 @@ describe('skills namespace isolation', () => {
     await fs.writeFile(join(oldSkills, 'brainstorming', 'SKILL.md'), '# User Brainstorming')
 
     // Install triggers migration
-    const result = await installWithFixture(['workflow'], migrateDir, true, {
+    const result = await installWithFixture(['plan'], migrateDir, true, {
       mcpProvider: 'skip',
     })
     expect(result.success).toBe(true)

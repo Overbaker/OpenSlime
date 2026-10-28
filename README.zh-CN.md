@@ -3,7 +3,7 @@
 > 设计原则见 [PRINCIPLES.md](PRINCIPLES.md)。为兼容已有安装，CLI 仍叫 `ccg`，包名仍是 `ccg-workflow`。
 
 > **这是 [fengshao1227/ccg-workflow](https://github.com/fengshao1227/ccg-workflow) 的精简 fork。**
-> 保留多模型串行链；移除每轮注入的 hooks、常驻路由规则、`/ccg:go` 引擎、正则质量关卡，以及 DeepSeek Harness（`dsh-ccg`）插件。**不支持把 DSH 作为宿主。**
+> 保留多模型串行链；移除每轮注入的 hooks、常驻路由规则、`/osm:go` 引擎、正则质量关卡，以及 DeepSeek Harness（`dsh-ccg`）插件。**不支持把 DSH 作为宿主。**
 > Claude 始终是编排者，Codex、Gemini、Antigravity、Grok、Kimi、OpenCode、Claude 通过 `codeagent-wrapper` 作为执行者被调用。可选的 Codex 主导模式（`ccg codex-mode`）与上游一致，未改动。
 > 删了什么、为什么删：[FORK.md](FORK.md)。English: [README.md](README.md)
 
@@ -11,7 +11,7 @@
 
 | 部分 | 作用 |
 |---|---|
-| `/ccg:spec-init → spec-research → spec-plan → spec-impl → spec-review` | OpenSpec 串行链。后端模型必选，前端模型只在 UI 改动时参与。`spec-impl` 让执行者只改明确列出的文件，Claude 审 diff，再由新会话独立审查。 |
+| `/osm:init → /osm:research → /osm:plan → /osm:impl → /osm:review` | OpenSpec 串行链。`/osm:impl` 中 codex 写后端、antigravity 写前端，各自只改明确列出的文件。Claude 负责监控：拆任务、审 diff、把所有修复退回给执行者，自己不写产品代码。最后由新会话独立审查。 |
 | `~/.claude/bin/codeagent-wrapper` | 统一调用各后端，支持 `resume <session>` 和带 `dependencies:` 的 `--parallel`。 |
 | `~/.claude/.ccg/prompts/<backend>/` | 各后端的角色提示词（analyzer、architect、builder、reviewer 等）。 |
 | 按需技能 | `frontend-design`、`scrapling`、`seo-page-builder`、`bt-panel`、`adsense-site-auditor`，调用前不注入任何内容。 |
@@ -37,7 +37,7 @@ node bin/ccg.mjs init --skip-prompt --skip-mcp --force # 默认配置
 ## 命令
 
 ```bash
-node bin/ccg.mjs                 # 菜单
+node bin/ccg.mjs                 # 菜单（同时安装为 `osm`）
 node bin/ccg.mjs init            # 安装 / 重装
 node bin/ccg.mjs doctor [--json] # 健康检查
 node bin/ccg.mjs skills list     # 原生技能选择

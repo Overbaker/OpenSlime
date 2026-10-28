@@ -168,7 +168,7 @@ Specific style variant specs with CSS tokens and component patterns:
 
 ## Technique Playbooks (20 Impeccable modules)
 
-These 20 techniques are **not** separate slash commands — they're this skill's toolbox. Each is a detailed step-by-step playbook at `impeccable/<name>/SKILL.md` (installed under `~/.claude/skills/ccg/impeccable/`). When a task calls for one, **read that file and apply it**; every playbook assumes the design principles above. Invoke `/ccg:frontend-design` once and pull in whichever techniques the work needs.
+These 20 techniques are **not** separate slash commands — they're this skill's toolbox. Each is a detailed step-by-step playbook at `impeccable/<name>/SKILL.md` (installed under `~/.claude/skills/ccg/impeccable/`). When a task calls for one, **read that file and apply it**; every playbook assumes the design principles above. Invoke `/osm:frontend-design` once and pull in whichever techniques the work needs.
 
 ### Quality & Audit
 | Technique | What it does |

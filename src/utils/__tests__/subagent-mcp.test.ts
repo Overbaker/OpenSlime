@@ -3,7 +3,7 @@
  *
  * Since v3.6.0 the wrapper makes sub-agents skip MCP by default, because a
  * sub-agent that only edits files and runs commands spends ~25s connecting
- * servers it never calls. `/ccg:codex-exec` is the one command built on the
+ * servers it never calls. the removed `/ccg:codex-exec` was built on the
  * opposite premise — its whole point is that the sub-agent does the retrieval
  * so Claude spends no tokens on it — and its payload names ace-tool, context7
  * and grok-search explicitly.
@@ -54,41 +54,12 @@ function payloadLines(template: string): string[] {
 }
 
 describe('sub-agents that are told to use MCP get MCP', () => {
-  const CODEX_EXEC = 'commands-legacy/codex-exec.md'
-
-  it('every executor call in codex-exec passes --with-mcp', () => {
-    const calls = wrapperCalls(CODEX_EXEC)
-    expect(calls.length).toBeGreaterThan(0)
-
-    // The executor is the one carrying the MCP-dependent payload; the reviewer
-    // reads a diff and the fixer works from file:line, so neither should pay
-    // the startup cost.
-    const executors = calls.filter(line => line.includes('EXEC_EOF'))
-    expect(executors.length).toBe(3)
-    for (const call of executors) {
-      expect(call, `executor call must opt into MCP:\n${call}`).toContain('--with-mcp')
-    }
-
-    const others = calls.filter(line => !line.includes('EXEC_EOF'))
-    for (const call of others) {
-      expect(call, `only the executor needs MCP:\n${call}`).not.toContain('--with-mcp')
-    }
-  })
-
-  it('the payload still asks the sub-agent for MCP retrieval', () => {
-    // If this stops being true the flag above is dead weight — and the reason
-    // for it, recorded in the template, would quietly stop applying.
-    const body = readFileSync(join(PACKAGE_ROOT, 'templates', CODEX_EXEC), 'utf-8')
-    expect(body).toMatch(/ace-tool MCP/)
-    expect(body).toMatch(/context7 MCP/)
-  })
-
-  it('no other command template asks a sub-agent to call MCP', () => {
-    // execute.md also names MCP, but there Claude itself is the caller — it is
-    // the one running the slash command, and it holds the servers. This pins
-    // the distinction so a future template does not quietly cross it.
-    const mcpInPayload = payloadLines('commands-legacy/execute.md')
-      .filter(line => line.includes('MCP'))
-    expect(mcpInPayload, 'execute.md must keep MCP on the Claude side').toEqual([])
+  // Every /osm:* worker runs without MCP (the wrapper default). If a payload ever
+  // asks the worker for MCP retrieval, its call must opt in with --with-mcp.
+  const templates = ['init', 'research', 'plan', 'impl', 'review'].map(name => `commands/${name}.md`)
+  it.each(templates)('%s keeps MCP on the Claude side or opts in', (template) => {
+    const asksForMcp = payloadLines(template).some(line => /mcp__|\bMCP\b/.test(line))
+    if (asksForMcp) expect(wrapperCalls(template).every(line => line.includes('--with-mcp'))).toBe(true)
+    else expect(asksForMcp).toBe(false)
   })
 })

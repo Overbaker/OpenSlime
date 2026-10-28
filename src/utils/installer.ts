@@ -253,7 +253,7 @@ async function copyMdTemplates(
  * Install slash command .md files from templates/commands/
  */
 async function installCommandFiles(ctx: InstallContext, workflowIds: string[]): Promise<void> {
-  const commandsDir = join(ctx.installDir, 'commands', 'ccg')
+  const commandsDir = join(ctx.installDir, 'commands', 'osm')
   const legacyIds = new Set(getLegacyCommandIds())
 
   for (const workflowId of workflowIds) {
@@ -284,7 +284,7 @@ async function installCommandFiles(ctx: InstallContext, workflowIds: string[]): 
 description: "${workflow.descriptionEn}"
 ---
 
-# /ccg:${cmd}
+# /osm:${cmd}
 
 ${workflow.description}
 
@@ -481,14 +481,14 @@ async function installSkillFiles(ctx: InstallContext): Promise<void> {
  * Auto-generate slash commands for user-invocable skills via Skill Registry.
  *
  * Scans templates/skills/ for SKILL.md files with `user-invocable: true` frontmatter,
- * then generates ~/.claude/commands/ccg/{name}.md for each — SKIPPING any name that
+ * then generates ~/.claude/commands/osm/{name}.md for each — SKIPPING any name that
  * already exists in installer-data.ts to avoid conflicts with complex multi-model commands.
  */
 async function installSkillGeneratedCommands(ctx: InstallContext): Promise<void> {
   if (ctx.config.skillsProfile !== undefined) return
   const skillsTemplateDir = join(ctx.templateDir, 'skills')
   const skillsInstallDir = join(ctx.installDir, 'skills', 'ccg')
-  const commandsDir = join(ctx.installDir, 'commands', 'ccg')
+  const commandsDir = join(ctx.installDir, 'commands', 'osm')
 
   if (!(await fs.pathExists(skillsTemplateDir))) return
 
@@ -816,7 +816,7 @@ export function showBinaryDownloadWarning(binDir: string): void {
   console.log(ansis.red.bold(`  ║     Binary download failed (network issue)                 ║`))
   console.log(ansis.red.bold(`  ╚════════════════════════════════════════════════════════════╝`))
   console.log()
-  console.log(ansis.yellow(`  多模型协作命令 (/ccg:workflow, /ccg:plan 等) 需要此文件才能工作。`))
+  console.log(ansis.yellow(`  多模型协作命令 (/osm:workflow, /osm:plan 等) 需要此文件才能工作。`))
   console.log(ansis.yellow(`  Multi-model commands require this binary to work.`))
   console.log()
   console.log(ansis.cyan(`  手动修复 / Manual fix:`))
@@ -927,9 +927,8 @@ const SLIMMED_ARTIFACTS = [
   'skills/ccg/orchestration',
   ...['ai', 'architecture', 'devops', 'development', 'data-engineering', 'infrastructure', 'mobile', 'orchestration', 'security']
     .map(name => `skills/ccg/domains/${name}`),
-  ...['go', 'init', 'context', 'commit', 'rollback', 'clean-branches', 'worktree', 'hi',
-    'gen-docs', 'verify-security', 'verify-quality', 'verify-change', 'verify-module']
-    .map(name => `commands/ccg/${name}.md`),
+  // Pre-OpenSlime slash namespace (/osm:*); commands now live in commands/osm
+  'commands/ccg',
 ]
 
 /** Moves retired artifacts to ~/.claude/.ccg-retired/<stamp>/ so user edits are never lost. */
@@ -1052,7 +1051,7 @@ export async function installWorkflows(
   }
 
   // Ensure base directories
-  await fs.ensureDir(join(installDir, 'commands', 'ccg'))
+  await fs.ensureDir(join(installDir, 'commands', 'osm'))
   await fs.ensureDir(join(installDir, '.ccg'))
   await fs.ensureDir(join(installDir, '.ccg', 'prompts'))
 
@@ -1077,7 +1076,7 @@ export async function installWorkflows(
   }
 
   if (ctx.result.errors.length > 0) ctx.result.success = false
-  ctx.result.configPath = join(installDir, 'commands', 'ccg')
+  ctx.result.configPath = join(installDir, 'commands', 'osm')
   return ctx.result
 }
 
@@ -1129,7 +1128,7 @@ export async function uninstallWorkflows(installDir: string, options?: { preserv
     result.success = false
   }
 
-  const commandsDir = join(installDir, 'commands', 'ccg')
+  const commandsDir = join(installDir, 'commands', 'osm')
   const agentsDir = join(installDir, 'agents', 'ccg')
   const skillsDir = join(installDir, 'skills', 'ccg')
   const rulesDir = join(installDir, 'rules')

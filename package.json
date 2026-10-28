@@ -30,6 +30,7 @@
     "workflow"
   ],
   "bin": {
+    "osm": "bin/ccg.mjs",
     "ccg": "bin/ccg.mjs"
   },
   "main": "dist/index.mjs",

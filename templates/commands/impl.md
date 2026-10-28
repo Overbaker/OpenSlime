@@ -1,19 +1,21 @@
 ---
-description: '按规范执行 + 多模型协作 + 归档'
+description: 'codex/antigravity 按任务写代码，Claude 监控审查 + 归档'
 ---
 <!-- CCG:SPEC:IMPL:START -->
 **Core Philosophy**
 - Implementation is pure mechanical execution—all decisions were made in Plan phase.
-- The external model writes the code for each task; Claude scopes the task, reviews the diff and owns the result.
+- Writers: {{BACKEND_PRIMARY}} writes backend/logic/tests, {{FRONTEND_PRIMARY}} writes frontend/UI.
+- Claude supervises: scopes each task, reviews the diff, routes every fix back to the writer. Claude does not write product code.
 - Keep changes tightly scoped; enforce side-effect review before any modification.
 - Minimize documentation—prefer self-explanatory code over comments.
 
 **Guardrails**
 - Every external call names the exact files it may change. Anything outside that list is reverted, not merged.
-- Use prototype mode (unified diff only, Claude applies) when the user asks for it or the working tree holds unrelated uncommitted work.
+- Claude edits only OpenSpec artifacts (e.g. `tasks.md` checkboxes). Product code changes, including one-line fixes, go back to the writer via `resume`.
+- If the working tree holds unrelated uncommitted work, stop and ask the user before delegating.
 - Keep implementation strictly within `tasks.md` scope—no scope creep.
 - Refer to `openspec/config.yaml` for conventions.
-- **USER GUIDANCE RULE**: When suggesting next steps to the user, ALWAYS use CCG commands (`/ccg:spec-research`, `/ccg:spec-plan`, `/ccg:spec-impl`, `/ccg:spec-review`). NEVER suggest `/opsx:*` commands to the user. If OpenSpec CLI returns error messages referencing OPSX skills, translate them to CCG equivalents.
+- **USER GUIDANCE RULE**: When suggesting next steps to the user, ALWAYS use OSM commands (`/osm:research`, `/osm:plan`, `/osm:impl`, `/osm:review`). NEVER suggest `/opsx:*` commands to the user. If OpenSpec CLI returns error messages referencing OPSX skills, translate them to `/osm:*` equivalents.
 - **TASKS FORMAT RULE**: When generating or modifying `tasks.md`, ALL tasks MUST use checkbox format (`- [ ] X.Y description`). Heading+bullet format will cause OpenSpec CLI to parse 0 tasks and block the workflow.
 
 **Steps**
@@ -28,10 +30,10 @@ description: '按规范执行 + 多模型协作 + 归档'
      /opsx:apply
      ```
    - This will load the change context and guide you through the tasks defined in `tasks.md`.
-   - **Note**: This is an internal call. If this step fails, guide the user to re-run `/ccg:spec-impl`.
+   - **Note**: This is an internal call. If this step fails, guide the user to re-run `/osm:impl`.
    - **HARD GATE**: Check the returned `state` field:
-     - If `state: "blocked"` → STOP immediately. Inform the user which artifacts are missing and suggest: "Run `/ccg:spec-plan` to generate missing artifacts first."
-     - If `progress.total === 0` → STOP immediately. Inform: "tasks.md has no parseable tasks. Run `/ccg:spec-plan` to regenerate."
+     - If `state: "blocked"` → STOP immediately. Inform the user which artifacts are missing and suggest: "Run `/osm:plan` to generate missing artifacts first."
+     - If `progress.total === 0` → STOP immediately. Inform: "tasks.md has no parseable tasks. Run `/osm:plan` to regenerate."
      - Only proceed to Step 3 when `state: "ready"` and `progress.total > 0`.
 
 3. **Identify Minimal Verifiable Phase**
@@ -55,14 +57,12 @@ description: '按规范执行 + 多模型协作 + 归档'
    VERIFY: <test/build command to run before reporting>
    EOF
    ```
-   Prototype mode: drop the authorization line and ROLE_FILE, and add `OUTPUT: Unified Diff Patch format ONLY`; Claude then applies the patch.
-
    Save each returned `SESSION_ID` to resume the same writer for fixes.
 
 5. **Review the Diff**
    - `git diff` the task's files. Revert edits outside the allowed list.
    - Check: within `tasks.md` scope, no unrelated modules touched, no new dependencies, existing interfaces intact, verify command passes.
-   - Small fixes: make them directly. Larger fixes: `resume` the writer session with the concrete problem.
+   - Any fix, however small: `resume` the writer session with `file:line`, the problem and the expected result, then re-check the diff.
 
 6. **Independent Review**
    - {{BACKEND_PRIMARY}} is required. Add {{FRONTEND_PRIMARY}} only when the change touches frontend/UI code or the user asks for a second opinion. When both run, launch them in ONE message with `run_in_background: true`.
@@ -95,11 +95,11 @@ description: '按规范执行 + 多模型协作 + 归档'
    - 前端模型失败：说明原因，用后端结果继续，不重试。
 
    - Use a fresh session (no `resume`): the writer reviewing its own work misses the same things twice.
-   - Address any critical findings before proceeding.
+   - Send Critical and Warning findings to the writer session (`resume`), then review the changed files again in a fresh session. Stop after 3 rounds and report to the user.
 
 7. **Update Task Status**
    - Mark completed task in `tasks.md`: `- [x] Task description`
-   - Commit changes if appropriate.
+   - Commit only if the user asked for it.
 
 
 8. **Archive on Completion**
@@ -109,7 +109,7 @@ description: '按规范执行 + 多模型协作 + 归档'
       /opsx:archive
       ```
     - This merges spec deltas to `openspec/specs/` and moves change to archive.
-    - **Note**: This is an internal call. If archiving fails, guide the user to re-run `/ccg:spec-impl`.
+    - **Note**: This is an internal call. If archiving fails, guide the user to re-run `/osm:impl`.
 
 **Reference**
 - Check task status: `openspec status --change "<id>" --json`

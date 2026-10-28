@@ -64,7 +64,7 @@ export async function status(): Promise<void> {
   const latestVer = execSafe('npm view ccg-workflow version') || 'unknown'
 
   // Commands
-  const cmds = (await dirFiles(join(installDir, 'commands', 'ccg'))).filter(f => f.endsWith('.md'))
+  const cmds = (await dirFiles(join(installDir, 'commands', 'osm'))).filter(f => f.endsWith('.md'))
 
   // Hooks
   const hooks = (await dirFiles(join(installDir, 'hooks', 'ccg'))).filter(f => f.endsWith('.js'))

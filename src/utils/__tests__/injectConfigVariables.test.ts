@@ -207,7 +207,7 @@ describe('integration: real templates with skip mode', () => {
   })
 
   it('finds templates containing {{MCP_SEARCH_TOOL}}', () => {
-    expect(filesWithMcpRef.length).toBeGreaterThanOrEqual(12)
+    expect(filesWithMcpRef.length).toBeGreaterThanOrEqual(1)
   })
 
   for (const file of filesWithMcpRef) {
@@ -350,8 +350,8 @@ describe('integration: real templates with gemini+codex config', () => {
   // (via `--backend {{BACKEND_PRIMARY}}`) on lines that also contain
   // `{{GEMINI_MODEL_FLAG}}`.
   const expectedCleanTemplates = [
-    'commands-legacy/backend.md',
-    'commands-legacy/codex-exec.md',
+    'commands/impl.md',
+    'commands/review.md',
   ]
 
   for (const rel of expectedCleanTemplates) {

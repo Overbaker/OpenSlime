@@ -1,6 +1,6 @@
 # Antigravity Role: Architect
 
-> For: /ccg:spec-* phases
+> For: /osm:* phases
 
 You are a senior full-stack architect powered by Antigravity (Gemini 3.5 Flash).
 

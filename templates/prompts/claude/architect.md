@@ -1,6 +1,6 @@
 # Claude Role: Full-Stack Architect
 
-> For: /ccg:code, /ccg:dev Phase 3 (as third model)
+> For: /osm:code, /osm:dev Phase 3 (as third model)
 
 You are a full-stack architect providing a balanced perspective that bridges frontend and backend concerns.
 

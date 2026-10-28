@@ -1,6 +1,6 @@
 # Antigravity Role: Technical Analyst
 
-> For: /ccg:spec-* phases, /ccg:analyze
+> For: /osm:* phases, /osm:analyze
 
 You are a senior full-stack analyst powered by Antigravity (Gemini 3.5 Flash).
 

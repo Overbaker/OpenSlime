@@ -3,7 +3,7 @@
 > Design rules: [PRINCIPLES.md](PRINCIPLES.md). The CLI is still `ccg` / package `ccg-workflow` for compatibility with existing installs.
 
 > **This is a slimmed-down fork** of [fengshao1227/ccg-workflow](https://github.com/fengshao1227/ccg-workflow).
-> It keeps the multi-model serial chain and removes per-turn hooks, always-on routing rules, the `/ccg:go` engine,
+> It keeps the multi-model serial chain and removes per-turn hooks, always-on routing rules, the `/osm:go` engine,
 > regex quality gates and the DeepSeek Harness (`dsh-ccg`) plugin. **DSH as a host is not supported.**
 > Claude stays the orchestrator; Codex, Gemini, Antigravity, Grok, Kimi, OpenCode and Claude are called as workers
 > through `codeagent-wrapper`. The optional Codex-led mode (`ccg codex-mode`) is unchanged from upstream.
@@ -13,7 +13,8 @@
 
 | Part | Purpose |
 |---|---|
-| `/ccg:spec-init → spec-research → spec-plan → spec-impl → spec-review` | OpenSpec chain. The backend model is required; the frontend model joins only for UI work. `spec-impl` lets the worker edit an explicit file list, Claude reviews the diff, a fresh session reviews the result. |
+| `/osm:init → /osm:research → /osm:plan → /osm:impl → /osm:review` | OpenSpec chain. In `/osm:impl` codex writes backend code and antigravity writes frontend code, each limited to an explicit file list. Claude supervises: it scopes tasks, reviews diffs and sends every fix back to the writer, but does not write product code. A fresh session reviews the result. |
+| `~/.claude/commands/osm/` | Slash commands (`/osm:*`). Upgrading moves the old `/ccg:*` commands aside. |
 | `~/.claude/bin/codeagent-wrapper` | One CLI for every backend, with `resume <session>` and `--parallel` tasks ordered by `dependencies:`. |
 | `~/.claude/.ccg/prompts/<backend>/` | Role prompts (analyzer, architect, builder, reviewer, …). |
 | On-demand skills | `frontend-design`, `scrapling`, `seo-page-builder`, `bt-panel`, `adsense-site-auditor`. Nothing is injected until you call them. |
@@ -39,7 +40,7 @@ Upgrading over an upstream install moves retired files to `~/.claude/.ccg-retire
 ## CLI
 
 ```bash
-node bin/ccg.mjs                 # menu
+node bin/ccg.mjs                 # menu (also installed as `osm`)
 node bin/ccg.mjs init            # install / reinstall
 node bin/ccg.mjs doctor [--json] # health check
 node bin/ccg.mjs skills list     # native skill selection
@@ -51,7 +52,7 @@ node bin/ccg.mjs uninstall
 
 ```
 ~/.claude/
-├── commands/ccg/          # spec-* and skill commands
+├── commands/osm/          # /osm:* chain and skill commands
 ├── skills/ccg/            # on-demand skills
 ├── rules/ccg-codegraph.md
 ├── .ccg/config.toml       # model routing

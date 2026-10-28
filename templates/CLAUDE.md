@@ -45,45 +45,45 @@
 
 | 命令文件 | slash command | 描述 |
 |----------|--------------|------|
-| `workflow.md` | `/ccg:workflow` | 多模型协作开发工作流（研究→构思→计划→执行→优化→评审），智能路由前端/后端 |
-| `plan.md` | `/ccg:plan` | 多模型协作规划：上下文检索 + 双模型分析 → 生成 Step-by-step 实施计划 |
-| `execute.md` | `/ccg:execute` | 多模型协作执行：根据计划获取原型 → Claude 重构实施 → 多模型审计交付 |
-| `codex-exec.md` | `/ccg:codex-exec` | 后端模型全权执行计划：MCP 搜索 + 代码实现 + 测试，多模型审核 |
-| `feat.md` | `/ccg:feat` | 智能功能开发：自动识别输入类型，规划/讨论/实施全流程 |
-| `frontend.md` | `/ccg:frontend` | 前端专项工作流（研究→构思→计划→执行→优化→评审），前端主模型主导 |
-| `backend.md` | `/ccg:backend` | 后端专项工作流（研究→构思→计划→执行→优化→评审），后端主模型主导 |
-| `enhance.md` | `/ccg:enhance` | 内置 Prompt 增强：将模糊需求转化为结构化任务描述 |
+| `workflow.md` | `/osm:workflow` | 多模型协作开发工作流（研究→构思→计划→执行→优化→评审），智能路由前端/后端 |
+| `plan.md` | `/osm:plan` | 多模型协作规划：上下文检索 + 双模型分析 → 生成 Step-by-step 实施计划 |
+| `execute.md` | `/osm:execute` | 多模型协作执行：根据计划获取原型 → Claude 重构实施 → 多模型审计交付 |
+| `codex-exec.md` | `/osm:codex-exec` | 后端模型全权执行计划：MCP 搜索 + 代码实现 + 测试，多模型审核 |
+| `feat.md` | `/osm:feat` | 智能功能开发：自动识别输入类型，规划/讨论/实施全流程 |
+| `frontend.md` | `/osm:frontend` | 前端专项工作流（研究→构思→计划→执行→优化→评审），前端主模型主导 |
+| `backend.md` | `/osm:backend` | 后端专项工作流（研究→构思→计划→执行→优化→评审），后端主模型主导 |
+| `enhance.md` | `/osm:enhance` | 内置 Prompt 增强：将模糊需求转化为结构化任务描述 |
 
 ### 分析与优化（4 个）
 
 | 命令文件 | slash command | 描述 |
 |----------|--------------|------|
-| `analyze.md` | `/ccg:analyze` | 多模型技术分析（并行）：后端视角 + 前端视角，交叉验证综合见解 |
-| `debug.md` | `/ccg:debug` | 多模型调试：后端诊断 + 前端诊断，交叉验证定位问题 |
-| `optimize.md` | `/ccg:optimize` | 多模型性能优化：后端优化 + 前端优化 |
-| `test.md` | `/ccg:test` | 多模型测试生成：智能路由后端测试 / 前端测试 |
+| `analyze.md` | `/osm:analyze` | 多模型技术分析（并行）：后端视角 + 前端视角，交叉验证综合见解 |
+| `debug.md` | `/osm:debug` | 多模型调试：后端诊断 + 前端诊断，交叉验证定位问题 |
+| `optimize.md` | `/osm:optimize` | 多模型性能优化：后端优化 + 前端优化 |
+| `test.md` | `/osm:test` | 多模型测试生成：智能路由后端测试 / 前端测试 |
 
 ### 代码质量（2 个）
 
 | 命令文件 | slash command | 描述 |
 |----------|--------------|------|
-| `review.md` | `/ccg:review` | 多模型代码审查：无参数时自动审查 git diff，双模型交叉验证 |
-| `context.md` | `/ccg:context` | 项目上下文管理：初始化 `.context` 目录、记录决策日志、压缩归档、查看历史 |
+| `review.md` | `/osm:review` | 多模型代码审查：无参数时自动审查 git diff，双模型交叉验证 |
+| `context.md` | `/osm:context` | 项目上下文管理：初始化 `.context` 目录、记录决策日志、压缩归档、查看历史 |
 
 ### 项目管理（1 个）
 
 | 命令文件 | slash command | 描述 |
 |----------|--------------|------|
-| `init.md` | `/ccg:init` | 初始化项目 AI 上下文：生成根级与模块级 CLAUDE.md 索引 |
+| `init.md` | `/osm:init` | 初始化项目 AI 上下文：生成根级与模块级 CLAUDE.md 索引 |
 
 ### Git 工具（4 个）
 
 | 命令文件 | slash command | 描述 |
 |----------|--------------|------|
-| `commit.md` | `/ccg:commit` | 智能 Git 提交：分析改动生成 Conventional Commit 信息，支持拆分建议 |
-| `rollback.md` | `/ccg:rollback` | 交互式 Git 回滚：安全回滚到历史版本，支持 reset/revert 模式 |
-| `clean-branches.md` | `/ccg:clean-branches` | 清理 Git 分支：安全清理已合并或过期分支，默认 dry-run 模式 |
-| `worktree.md` | `/ccg:worktree` | 管理 Git Worktree：在 `../.ccg/项目名/` 目录创建，支持 IDE 集成 |
+| `commit.md` | `/osm:commit` | 智能 Git 提交：分析改动生成 Conventional Commit 信息，支持拆分建议 |
+| `rollback.md` | `/osm:rollback` | 交互式 Git 回滚：安全回滚到历史版本，支持 reset/revert 模式 |
+| `clean-branches.md` | `/osm:clean-branches` | 清理 Git 分支：安全清理已合并或过期分支，默认 dry-run 模式 |
+| `worktree.md` | `/osm:worktree` | 管理 Git Worktree：在 `../.ccg/项目名/` 目录创建，支持 IDE 集成 |
 
 ### Agent Teams 并行系列（5 个，v1.7.60+ / v1.8.3+）
 
@@ -91,21 +91,21 @@
 
 | 命令文件 | slash command | 描述 |
 |----------|--------------|------|
-| `team.md` | `/ccg:team` | **统一工作流（推荐）**：8 阶段全流程（需求→架构→规划→开发→测试→审查→修复→集成），7 角色自动编排 |
-| `team-research.md` | `/ccg:team-research` | 需求研究：并行探索代码库，产出约束集 + 可验证成功判据 |
-| `team-plan.md` | `/ccg:team-plan` | 规划：Lead 调用前端/后端模型并行分析，产出零决策并行实施计划 |
-| `team-exec.md` | `/ccg:team-exec` | 并行实施：读取计划文件，spawn Builder teammates 并行写代码 |
-| `team-review.md` | `/ccg:team-review` | 双模型交叉审查：分级处理 Critical/Warning/Info |
+| `team.md` | `/osm:team` | **统一工作流（推荐）**：8 阶段全流程（需求→架构→规划→开发→测试→审查→修复→集成），7 角色自动编排 |
+| `team-research.md` | `/osm:team-research` | 需求研究：并行探索代码库，产出约束集 + 可验证成功判据 |
+| `team-plan.md` | `/osm:team-plan` | 规划：Lead 调用前端/后端模型并行分析，产出零决策并行实施计划 |
+| `team-exec.md` | `/osm:team-exec` | 并行实施：读取计划文件，spawn Builder teammates 并行写代码 |
+| `team-review.md` | `/osm:team-review` | 双模型交叉审查：分级处理 Critical/Warning/Info |
 
 ### OpenSpec (OPSX) 系列（5 个）
 
 | 命令文件 | slash command | 描述 |
 |----------|--------------|------|
-| `spec-init.md` | `/ccg:spec-init` | 初始化 OPSX 环境 + 验证多模型 MCP 工具 |
-| `spec-research.md` | `/ccg:spec-research` | 需求 → 约束集（并行探索 + OPSX 提案） |
-| `spec-plan.md` | `/ccg:spec-plan` | 多模型分析 → 消除歧义 → 零决策可执行计划 |
-| `spec-impl.md` | `/ccg:spec-impl` | 按规范执行 + 多模型协作 + 归档 |
-| `spec-review.md` | `/ccg:spec-review` | 双模型交叉审查（独立工具，随时可用） |
+| `init.md` | `/osm:init` | 初始化 OPSX 环境 + 验证多模型 MCP 工具 |
+| `research.md` | `/osm:research` | 需求 → 约束集（并行探索 + OPSX 提案） |
+| `plan.md` | `/osm:plan` | 多模型分析 → 消除歧义 → 零决策可执行计划 |
+| `impl.md` | `/osm:impl` | 按规范执行 + 多模型协作 + 归档 |
+| `review.md` | `/osm:review` | 双模型交叉审查（独立工具，随时可用） |
 
 ---
 
@@ -180,12 +180,12 @@
 
 | 目录 | slash command | 触发场景 |
 |------|--------------|---------|
-| `gen-docs/` | `/ccg:gen-docs` | 新建模块 → 生成 README.md + DESIGN.md 骨架 |
-| `verify-module/` | `/ccg:verify-module` | 模块完成后 → 扫描结构完整性 |
-| `verify-security/` | `/ccg:verify-security` | 新模块/安全变更/重构 → 漏洞扫描 |
-| `verify-change/` | `/ccg:verify-change` | >30 行变更 → 文档同步状态分析 |
-| `verify-quality/` | `/ccg:verify-quality` | 复杂模块/重构 → 复杂度/重复/命名检查 |
-| `override-refusal/` | `/ccg:hi` | 会话级反拒绝覆写器 |
+| `gen-docs/` | `/osm:gen-docs` | 新建模块 → 生成 README.md + DESIGN.md 骨架 |
+| `verify-module/` | `/osm:verify-module` | 模块完成后 → 扫描结构完整性 |
+| `verify-security/` | `/osm:verify-security` | 新模块/安全变更/重构 → 漏洞扫描 |
+| `verify-change/` | `/osm:verify-change` | >30 行变更 → 文档同步状态分析 |
+| `verify-quality/` | `/osm:verify-quality` | 复杂模块/重构 → 复杂度/重复/命名检查 |
+| `override-refusal/` | `/osm:hi` | 会话级反拒绝覆写器 |
 | `lib/` | 共享库 | `shared.js`：各 scripted 技能共用工具函数 |
 
 **脚本文件分布**：
@@ -255,13 +255,13 @@
 
 ### impeccable/（20 个设计 playbook — v3.5.1 起收敛为 frontend-design 的知识模块，不再是独立命令）
 
-每个 playbook 为独立子目录含 `SKILL.md`（部分含 `reference/`）。**v3.5.1 起全部 `user-invocable: false`**：曾经的 20 个 `/ccg:polish`/`critique`/… 平铺命令占了可调用命令的 65%，而它们已被 `/ccg:frontend-design` 完整融合。现统一由 `/ccg:frontend-design` 一个入口统领，各手法作为其 playbook 按需读取（`domains/frontend-design/SKILL.md` 的「Technique Playbooks」章节列出全部 20 个 + 读取路径）。文件保留、知识零丢失，仅不再各自生成 slash command。
+每个 playbook 为独立子目录含 `SKILL.md`（部分含 `reference/`）。**v3.5.1 起全部 `user-invocable: false`**：曾经的 20 个 `/osm:polish`/`critique`/… 平铺命令占了可调用命令的 65%，而它们已被 `/osm:frontend-design` 完整融合。现统一由 `/osm:frontend-design` 一个入口统领，各手法作为其 playbook 按需读取（`domains/frontend-design/SKILL.md` 的「Technique Playbooks」章节列出全部 20 个 + 读取路径）。文件保留、知识零丢失，仅不再各自生成 slash command。
 
 `adapt` · `animate` · `arrange` · `audit` · `bolder` · `clarify` · `colorize` · `critique` · `delight` · `distill` · `extract` · `harden` · `normalize` · `onboard` · `optimize` · `overdrive` · `polish` · `quieter` · `teach-impeccable` · `typeset`
 
 ### scrapling/
 
-网页抓取技能，支持 Cloudflare/WAF 绕过，触发词：`scrapling`，命令：`/ccg:scrapling`。
+网页抓取技能，支持 Cloudflare/WAF 绕过，触发词：`scrapling`，命令：`/osm:scrapling`。
 
 ### orchestration/multi-agent/
 
@@ -359,7 +359,7 @@ templates/rules/                   # 目录整体
 
 2. **Skill Registry frontmatter 驱动**（v2.0.0）：新增技能只需写 SKILL.md 并设 `user-invocable: true`，无需改 TypeScript 代码即可自动生成 slash command。`scripted` 技能（有 `scripts/*.js`）和 `knowledge` 技能（纯 Markdown）生成内容不同。
 
-3. **commands/ vs skills/impeccable/**：`commands/` 是核心开发工作流命令，手动维护在 `installer-data.ts` 注册表中。`impeccable/` 曾通过 Skill Registry 各自注册为 `/ccg:` 命令，**v3.5.1 起全部 `user-invocable: false`**——收敛为 `/ccg:frontend-design` 的 playbook，不再生成独立命令（避免 20 个平铺命令淹没命令列表）。Skill Registry 仍扫描它们，只是 `installSkillCommands()` 只为 `user-invocable: true` 者生成命令。
+3. **commands/ vs skills/impeccable/**：`commands/` 是核心开发工作流命令，手动维护在 `installer-data.ts` 注册表中。`impeccable/` 曾通过 Skill Registry 各自注册为 `/osm:` 命令，**v3.5.1 起全部 `user-invocable: false`**——收敛为 `/osm:frontend-design` 的 playbook，不再生成独立命令（避免 20 个平铺命令淹没命令列表）。Skill Registry 仍扫描它们，只是 `installSkillCommands()` 只为 `user-invocable: true` 者生成命令。
 
 4. **output-styles 独立安装路径**：与其他素材不同，output-styles 不经过主 `installWorkflows()` 管线，而是由菜单的 `installOutputStyle()` 按需安装到 `~/.claude/output-styles/`，允许用户按需切换风格而不重新全量安装。
 

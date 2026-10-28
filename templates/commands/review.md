@@ -87,7 +87,7 @@ description: '双模型交叉审查（独立工具，随时可用）'
 6. **Decision Gate**
    - **If Critical > 0**:
      * Present findings to user.
-     * Ask: "Fix now or return to `/ccg:spec-impl` to address?"
+     * Ask: "Fix now or return to `/osm:impl` to address?"
      * Do NOT allow archiving.
 
    - **If Critical = 0**:
@@ -113,5 +113,5 @@ Review is complete when:
 - View proposal: `openspec status --change "<id>" --json`
 - Check spec constraints: `rg -n "CONSTRAINT:|MUST|INVARIANT:" openspec/changes/<id>/specs/`
 - View implementation diff: `git diff`
-- Archive (after passing): `/ccg:spec-impl` → Step 10
+- Archive (after passing): `/osm:impl` → Step 10
 <!-- CCG:SPEC:REVIEW:END -->

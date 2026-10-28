@@ -320,7 +320,7 @@ async function performUpdate(fromVersion: string, toVersion: string, isNewVersio
 
   // Directories to back up before installing new version
   const backupTargets = [
-    join(installDir, 'commands', 'ccg'),
+    join(installDir, 'commands', 'osm'),
     join(installDir, 'agents', 'ccg'),
     join(installDir, 'skills', 'ccg'),
     join(installDir, 'hooks', 'ccg'),
@@ -375,7 +375,7 @@ async function performUpdate(fromVersion: string, toVersion: string, isNewVersio
     })
 
     // Step 5: Verify new installation actually produced files
-    const commandsDir = join(installDir, 'commands', 'ccg')
+    const commandsDir = join(installDir, 'commands', 'osm')
     const hasCommands = await fs.pathExists(commandsDir)
       && (await fs.readdir(commandsDir)).some(f => f.endsWith('.md'))
 
@@ -389,7 +389,7 @@ async function performUpdate(fromVersion: string, toVersion: string, isNewVersio
         console.log()
         console.log(ansis.cyan(i18n.t('update:installed', { count: config.workflows.installed.length })))
         for (const cmd of config.workflows.installed) {
-          console.log(`  ${ansis.gray('•')} /ccg:${cmd}`)
+          console.log(`  ${ansis.gray('•')} /osm:${cmd}`)
         }
       }
     }

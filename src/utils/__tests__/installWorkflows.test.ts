@@ -62,7 +62,7 @@ describe('installWorkflows E2E — mcpProvider="skip"', () => {
   }, 30_000)
 
   it('generated command files contain no mcp__ace-tool references', async () => {
-    const cmdDir = join(tmpDir, 'commands', 'ccg')
+    const cmdDir = join(tmpDir, 'commands', 'osm')
     const files = collectMdFiles(cmdDir)
     expect(files.length).toBeGreaterThan(0)
 
@@ -75,14 +75,8 @@ describe('installWorkflows E2E — mcpProvider="skip"', () => {
     }
   })
 
-  it('plan.md contains Glob + Grep fallback guidance', async () => {
-    const content = readFileSync(join(tmpDir, 'commands', 'ccg', 'plan.md'), 'utf-8')
-    expect(content).toContain('Glob + Grep')
-    expect(content).toContain('MCP 未配置')
-  })
-
-  it('execute.md contains Glob + Grep fallback guidance', async () => {
-    const content = readFileSync(join(tmpDir, 'commands', 'ccg', 'execute.md'), 'utf-8')
+  it('research.md contains Glob + Grep fallback guidance', async () => {
+    const content = readFileSync(join(tmpDir, 'commands', 'osm', 'research.md'), 'utf-8')
     expect(content).toContain('Glob + Grep')
     expect(content).toContain('MCP 未配置')
   })
@@ -109,7 +103,7 @@ describe('installWorkflows E2E — mcpProvider="ace-tool" (control)', () => {
   }, 30_000)
 
   it('generated files contain mcp__ace-tool__search_context (correct injection)', async () => {
-    const planContent = readFileSync(join(tmpDir, 'commands', 'ccg', 'plan.md'), 'utf-8')
+    const planContent = readFileSync(join(tmpDir, 'commands', 'osm', 'research.md'), 'utf-8')
     expect(planContent).toContain('mcp__ace-tool__search_context')
     expect(planContent).not.toContain('{{MCP_SEARCH_TOOL}}')
   })

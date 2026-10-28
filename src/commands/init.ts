@@ -845,32 +845,8 @@ export async function init(options: InitOptions = {}): Promise<void> {
 
       liteMode = perfMode === 'lite'
 
-      // Version mode: v3 (OpenSpec chain) or legacy (adds the optional legacy commands)
-      const { versionMode } = await inquirer.prompt([{
-        type: 'list',
-        name: 'versionMode',
-        message: '安装模式',
-        choices: [
-          { name: `${ansis.green('v3 精简')} — OpenSpec 多模型串行链（spec-init/research/plan/impl/review，推荐）`, value: 'v3' },
-          { name: `${ansis.gray('旧版兼容')} — 精简版 + 18 个旧版命令（workflow/debug/team 等）`, value: 'legacy' },
-        ],
-        default: 'v3',
-      }])
-      installMode = versionMode
-      if (versionMode === 'legacy') {
-        selectedWorkflows = getAllCommandIds()
-        const { includeImpeccable } = await inquirer.prompt([{
-          type: 'confirm',
-          name: 'includeImpeccable',
-          message: i18n.t('init:commands.includeImpeccable'),
-          default: !skipImpeccable,
-        }])
-        skipImpeccable = !includeImpeccable
-      }
-      else {
-        selectedWorkflows = getCoreCommandIds()
-        skipImpeccable = true
-      }
+      selectedWorkflows = getCoreCommandIds()
+      skipImpeccable = true
       if (requestedSkills === undefined) {
         const { skillsMode } = await inquirer.prompt([{
           type: 'list',
@@ -1338,7 +1314,7 @@ export async function init(options: InitOptions = {}): Promise<void> {
 
       // ═══════════════════════════════════════════════════════
       // Sync MCP servers to Codex (~/.codex/config.toml)
-      // Enables /ccg:codex-exec to use MCP tools (grok-search, context7, etc.)
+      // Enables /osm:codex-exec to use MCP tools (grok-search, context7, etc.)
       // ═══════════════════════════════════════════════════════
       const codexSyncResult = await syncMcpToCodex()
       if (codexSyncResult.success && codexSyncResult.synced.length > 0) {
@@ -1372,7 +1348,7 @@ export async function init(options: InitOptions = {}): Promise<void> {
     console.log()
     console.log(ansis.cyan(`  ${i18n.t('init:installedCommands')}`))
     result.installedCommands.forEach((cmd) => {
-      console.log(`    ${ansis.green('✓')} /ccg:${cmd}`)
+      console.log(`    ${ansis.green('✓')} /osm:${cmd}`)
     })
 
     // Show installed prompts

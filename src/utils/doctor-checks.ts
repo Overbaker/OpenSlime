@@ -114,7 +114,7 @@ function selectedBackends(config: RecordValue): { names: string[], invalid: bool
 }
 
 async function modeChecks(installDir: string, codexDir: string, hasNativeSkills: boolean) {
-  const commandFiles = (await files(join(installDir, 'commands', 'ccg'))).filter(f => f.endsWith('.md'))
+  const commandFiles = (await files(join(installDir, 'commands', 'osm'))).filter(f => f.endsWith('.md'))
   const claude = commandFiles.length > 0 || await fs.pathExists(join(installDir, 'commands', 'ccg.md'))
   const marker = await readText(join(codexDir, '.ccg-version'))
   const agents = await readText(join(codexDir, 'AGENTS.md'))

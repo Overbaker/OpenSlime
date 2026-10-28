@@ -147,7 +147,7 @@ export async function needsMigration(): Promise<boolean> {
 
   const oldCcgDir = join(homedir(), '.ccg')
   const oldPromptsDir = join(homedir(), '.claude', 'prompts', 'ccg')
-  const oldConfigFile = join(homedir(), '.claude', 'commands', 'ccg', '_config.md')
+  const oldConfigFile = join(homedir(), '.claude', 'commands', 'osm', '_config.md')
 
   const hasOldCcgDir = await fs.pathExists(oldCcgDir)
   const hasOldPromptsDir = await fs.pathExists(oldPromptsDir)

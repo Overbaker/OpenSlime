@@ -14,8 +14,8 @@ description: '需求 → 约束集（并行探索 + OPSX 提案）'
 - Each subagent context must be self-contained with independent output.
 - Use `{{MCP_SEARCH_TOOL}}` to minimize grep/find operations.
 - Do not make architectural decisions—surface constraints that guide decisions.
-- **USER GUIDANCE RULE**: When suggesting next steps to the user, ALWAYS use CCG commands (`/ccg:spec-research`, `/ccg:spec-plan`, `/ccg:spec-impl`, `/ccg:spec-review`). NEVER suggest `/opsx:*` commands to the user. If OpenSpec CLI returns error messages referencing OPSX skills, translate them to CCG equivalents.
-- **PHASE BOUNDARY**: This phase ONLY generates the OPSX proposal artifact. Do NOT modify any source code. Do NOT proceed to planning or implementation. After the proposal is generated, STOP and inform the user: "Research complete. Run `/ccg:spec-plan` to continue."
+- **USER GUIDANCE RULE**: When suggesting next steps to the user, ALWAYS use OSM commands (`/osm:research`, `/osm:plan`, `/osm:impl`, `/osm:review`). NEVER suggest `/opsx:*` commands to the user. If OpenSpec CLI returns error messages referencing OPSX skills, translate them to `/osm:*` equivalents.
+- **PHASE BOUNDARY**: This phase ONLY generates the OPSX proposal artifact. Do NOT modify any source code. Do NOT proceed to planning or implementation. After the proposal is generated, STOP and inform the user: "Research complete. Run `/osm:plan` to continue."
 
 **Steps**
 0. **Clarify the Requirement**
@@ -132,9 +132,9 @@ description: '需求 → 约束集（并行探索 + OPSX 提案）'
      /opsx:continue
      ```
    - The OPSX skill will use the above summary to write proposal.md.
-   - **Note**: This is an internal call. If this step fails, guide the user to re-run `/ccg:spec-research`.
+   - **Note**: This is an internal call. If this step fails, guide the user to re-run `/osm:research`.
    - **STOP**: After proposal is generated, verify it exists and inform user:
-     "Research phase complete. Proposal generated. Run `/ccg:spec-plan` to continue planning."
+     "Research phase complete. Proposal generated. Run `/osm:plan` to continue planning."
      Do NOT proceed to planning or implementation.
 
 
