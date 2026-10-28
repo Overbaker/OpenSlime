@@ -55,8 +55,8 @@ describe('npm tarball does not ship red-team notes', () => {
     // `.npmignore` does NOT override a directory already listed in `files`.
     const files: string[] = pkg.files
     expect(files.some(f => f === 'templates/skills/' || f.endsWith('domains/security') || f.includes('domains/security/'))).toBe(false)
-    expect(files).toContain('templates/skills/domains/ai/')
-    expect(files).toContain('templates/skills/tools/')
+    expect(files).toContain('templates/skills/domains/seo/')
+    expect(files).toContain('templates/skills/scrapling/')
   })
 
   it('npm pack actually omits domains/security', { timeout: 60_000 }, () => {

@@ -26,11 +26,7 @@ permissions:
   id-token: write # mints the OIDC token npm authenticates against
 
 jobs:
-  dsh-compatibility:
-    uses: ./.github/workflows/dsh-compat.yml
-
   publish:
-    needs: dsh-compatibility
     runs-on: ubuntu-latest
     environment: npm-publish
 

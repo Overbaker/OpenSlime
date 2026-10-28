@@ -10,7 +10,8 @@ models (Claude Opus/Fable, GPT-codex) already do better without it.
 - `/ccg:spec-init → spec-research → spec-plan → spec-impl → spec-review` on OpenSpec.
 - Role prompts in `~/.claude/.ccg/prompts/<backend>/`.
 - On-demand skills: `frontend-design` (+ impeccable playbooks), `scrapling`, `seo-page-builder` (+ `domains/seo`), `bt-panel`, `adsense-site-auditor`.
-- `rules/ccg-codegraph.md`, optional legacy commands, output styles, Codex mode, DeepSeek Harness plugin.
+- `rules/ccg-codegraph.md`, optional legacy commands, output styles, Codex-led mode (`ccg codex-mode`).
+- Every worker backend of `codeagent-wrapper`: codex, claude, gemini, antigravity, grok, kimi, opencode.
 
 ## Removed
 
@@ -22,6 +23,7 @@ models (Claude Opus/Fable, GPT-codex) already do better without it.
 | `verify-quality/security/change/module`, `gen-docs` | Regex scanners with fixed thresholds (e.g. snake_case function names in TypeScript); noise for capable models. |
 | `/ccg:hi` (override-refusal) | Rewrote the session transcript to replace refusals. |
 | `domains/` except `frontend-design` and `seo`, `orchestration/multi-agent` | Textbook content the models already know. |
+| DeepSeek Harness plugin (`dsh-ccg/`, `ccg dsh`, menu D) | Installing CCG *into* DSH as a host is out of scope; DSH is not a wrapper backend either. |
 | `/ccg:init`, `context`, `commit`, `rollback`, `clean-branches`, `worktree`, `agents/ccg/*` | Native Claude Code covers them. |
 
 ## Behaviour changes in the spec chain
@@ -36,10 +38,10 @@ Every bundled style sets `keep-coding-instructions: true`. Without it a custom o
 
 Running `ccg init` / `ccg update` from this fork also moves the artifacts above from an earlier full install to `~/.claude/.ccg-retired/<timestamp>/` and unregisters only the CCG hook commands, keeping your own hooks and rules.
 
-## Install from this fork
+## Install
 
 ```bash
-git clone -b slim https://github.com/AIR-HAN/ccg-workflow.git && cd ccg-workflow
+git clone -b slim <this-repo-url> ccg-slim && cd ccg-slim
 pnpm install && pnpm build
 node bin/ccg.mjs init            # or: node bin/ccg.mjs init --skip-prompt --skip-mcp --force
 ```
