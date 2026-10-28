@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="420" height="96" viewBox="0 0 420 96" role="img" aria-label="OpenSlime">
+  <path fill="#3fb98a" d="M48 10C70 10 84 32 86 58C87 70 84 80 76 80C70 80 68 74 62 74C56 74 55 82 48 82C41 82 40 74 34 74C28 74 26 80 20 80C12 80 9 70 10 58C12 32 26 10 48 10Z"/>
+  <ellipse cx="34" cy="34" rx="5.5" ry="9" fill="#fff" fill-opacity=".55" transform="rotate(28 34 34)"/>
+  <text x="112" y="66" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="52" letter-spacing="-1.2"><tspan fill="#a3a8b4" font-weight="400">Open</tspan><tspan fill="#f2f3f5" font-weight="700">Slime</tspan></text>
+</svg>

@@ -1,48 +1,65 @@
-# OpenSlime
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/brand/openslime-lockup-dark.svg">
+    <img src="assets/brand/openslime-lockup-light.svg" width="360" alt="OpenSlime">
+  </picture>
+</p>
 
-基于 OpenSpec 的极简 Claude 主导多 agent 协同开发框架；Claude 统筹编排，Codex 编写后端，Antigravity 编写前端。
+<p align="center">
+  <em>Claude 规划与审查，Codex 写后端，Antigravity 写前端。</em><br>
+  <sub>基于 OpenSpec 的极简 Claude Code 多 agent 协同开发。</sub>
+</p>
 
-[fengshao1227/ccg-workflow](https://github.com/fengshao1227/ccg-workflow) 的精简 fork（MIT）。[English](README.md)
+<p align="center">
+  <img src="https://img.shields.io/badge/for-Claude%20Code-111111?style=flat-square" alt="For Claude Code">
+  <img src="https://img.shields.io/badge/built%20on-OpenSpec-111111?style=flat-square" alt="Built on OpenSpec">
+  <img src="https://img.shields.io/badge/hooks-none-111111?style=flat-square" alt="No hooks">
+  <img src="https://img.shields.io/badge/license-MIT-111111?style=flat-square" alt="MIT license">
+</p>
 
-## 让 AI Agent 安装
+<p align="center"><sub><a href="README.md">English</a> &middot; 简体中文</sub></p>
 
-将以下内容发送给你的 AI coding agent（Claude Code、Codex）：
+---
+
+## 安装
+
+把下面这段发给你的 coding agent（Claude Code、Codex）：
 
 ```text
 Install OpenSlime from https://github.com/Overbaker/OpenSlime. Follow AGENTS.md in that repo, then run its doctor check and tell me the result.
 ```
 
-手动安装步骤详见 [AGENTS.md](AGENTS.md)。
+手动安装见 [AGENTS.md](AGENTS.md)。
 
-## 工作流程
+## 五个命令
 
-1. `/osm:init`：配置 OpenSpec 并检查模型 CLI。
-2. `/osm:research`：需求分析 &rarr; 约束提取与 OpenSpec 提案。
-3. `/osm:plan`：零决策方案设计（specs、design、`tasks.md`）。
-4. `/osm:impl`：分发执行各任务。
-5. `/osm:review`：归档前的独立会话复审。
+| 命令 | 作用 |
+| --- | --- |
+| `/osm:init` | 配置 OpenSpec，检查模型 CLI。 |
+| `/osm:research` | 需求 &rarr; 约束集 + OpenSpec 提案。 |
+| `/osm:plan` | 零决策计划：specs、design、`tasks.md`。 |
+| `/osm:impl` | 把任务交给执行者写，Claude 审查 diff。 |
+| `/osm:review` | 归档前的独立会话复审。 |
 
-- **`/osm:impl` 角色分工**：`codex` 编写后端/逻辑/测试；`antigravity` 编写前端/UI（仅限 UI 范围）。每个任务显式列出执行者允许修改的文件白名单。
-- **Claude 监督审查**：Claude 划定任务范围并审查代码 diff。
-- **修复规则（Fix Rules）**：保持行为不变的 &le;5 行机械性修改（拼写、import、类型标注等）由 Claude 直接修复并重新执行 `VERIFY`；涉及逻辑、分支、接口变更或 >5 行的问题通过 `resume` 退回原执行者修改；同一执行者连续失败 2 次后 Claude 征求用户意见再决定是否接管。
-- **始终交叉**：`/osm:research`、`/osm:plan`、`/osm:review`（以及 `/osm:impl` 的审查步骤）都让 codex 和 antigravity 在新会话里各自独立完成，Claude 对比两者的一致与分歧。
-- **可选对比**：`/osm:impl --compare` 会在独立 git worktree 里另开一个子 agent，由它自己判断用自己还是 antigravity 来写、临时加载哪个 skill，主 Claude 和 codex 不受影响；交叉审查留下更好的结果。
-- **阶段报告**：每次 `/osm:*` 结束时在 `${TMPDIR:-/tmp}/osm-reports/` 下生成一份临时报告，附置信度评估（高/中/低，百分比）。
+## 工作方式
+
+- **限定范围的执行者。** `/osm:impl` 中 `codex` 写后端、逻辑和测试，`antigravity` 写 UI；每个任务列出执行者可改的文件。
+- **Claude 监督。** 不改变行为、&le;5 行的机械问题由 Claude 直接修并重跑 `VERIFY`；更大的改动通过 `resume` 退回执行者；同一执行者失败两次后，先问你再决定是否接管。
+- **始终交叉。** research、plan、review 都让 codex 和 antigravity 在各自的新会话里独立完成，Claude 对比一致与分歧。
+- **可选对比。** `/osm:impl --compare` 在独立 git worktree 里加一个子 agent，由它自己选执行者和 skill；交叉审查留下更好的结果。
+- **阶段报告。** 每次运行结束都在 `${TMPDIR:-/tmp}/osm-reports/` 生成报告，附置信度（高/中/低，百分比）。
 
 ## 为何轻量
 
-- **无每轮注入**：唯一常驻文本是一个精简规则文件（`rules/ccg-codegraph.md`）；无 hooks。内置技能（`frontend-design`、`scrapling`、`seo-page-builder`、`bt-panel`、`adsense-site-auditor`）仅在调用时按需加载。输出样式保留 Claude Code 内置的工程规范（`keep-coding-instructions: true`）。
-- **单一主循环**：Claude 负责规划、决策并与用户交互，前面无路由层或多层规划 agent。
-- **外部模型物尽其用**：仅在划定范围的代码编写（`codex` 后端、`antigravity` 前端）或新会话独立复审中调用外部模型。不支持把 DeepSeek Harness 作为宿主；保留 Codex 主导模式（`node bin/ccg.mjs codex-mode install`）与所有 wrapper 后端（`codex`、`claude`、`gemini`、`antigravity`、`grok`、`kimi`、`opencode`）。
+- **不做每轮注入。** 无 hooks，只有一个常驻小规则（`rules/ccg-codegraph.md`）。技能（`frontend-design`、`scrapling`、`seo-page-builder`、`bt-panel`、`adsense-site-auditor`）调用时才加载。输出样式保留 Claude Code 内置的编码规范。
+- **单一主循环。** Claude 规划、决策并与你对话，前面没有路由层。
+- **外部模型只用在值得的地方：** 限定范围的编写，或新会话里的第二意见。保留 Codex 主导模式（`node bin/ccg.mjs codex-mode install`）和全部 wrapper 后端（`codex`、`claude`、`gemini`、`antigravity`、`grok`、`kimi`、`opencode`）；不支持把 DeepSeek Harness 作为宿主。
 
-设计原则详见 [PRINCIPLES.md](PRINCIPLES.md)，上游移除组件与原因详见 [FORK.md](FORK.md)。
+设计原则见 [PRINCIPLES.md](PRINCIPLES.md)。
 
 ## 环境要求
 
-- Node.js 20+、pnpm、git、Claude Code。
-- Codex CLI（`codex`，已登录）。
-- Antigravity CLI（`agy`，已登录）。
-- OpenSpec CLI：`npm i -g @fission-ai/openspec`（或由 `/osm:init` 自动引导安装）。
+Node.js 20+、pnpm、git、Claude Code；已登录的 `codex` 与 `agy`（Antigravity）CLI；OpenSpec（`npm i -g @fission-ai/openspec`，或由 `/osm:init` 引导安装）。
 
 ## 更新与卸载
 
@@ -54,4 +71,13 @@ cd ~/OpenSlime && git pull && pnpm install && pnpm build && node bin/ccg.mjs ini
 cd ~/OpenSlime && node bin/ccg.mjs uninstall
 ```
 
-> 致谢：上游 [fengshao1227/ccg-workflow](https://github.com/fengshao1227/ccg-workflow) 及其贡献者；[stellarlinkco/myclaude](https://github.com/stellarlinkco/myclaude)（codeagent-wrapper）；审查标准改编自 [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail)；输出形态精简自 [ayghri/i-have-adhd](https://github.com/ayghri/i-have-adhd)；ace-tool。均遵循 MIT 协议。许可证：MIT（[LICENSE](LICENSE)）。
+## 致谢
+
+OpenSlime 是 [fengshao1227/ccg-workflow](https://github.com/fengshao1227/ccg-workflow) 的精简 fork，移除了什么、为什么见 [FORK.md](FORK.md)。感谢上游贡献者，以及：
+
+- [stellarlinkco/myclaude](https://github.com/stellarlinkco/myclaude)：`codeagent-wrapper`
+- [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail)：审查标准
+- [ayghri/i-have-adhd](https://github.com/ayghri/i-have-adhd)：输出形态
+- ace-tool
+
+均为 MIT 协议。OpenSlime 同样采用 [MIT](LICENSE)。
