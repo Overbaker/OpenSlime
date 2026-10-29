@@ -10,7 +10,10 @@ What the installation writes:
 - `~/.claude/.ccg/{config.toml,prompts/}`
 - `~/.claude/rules/ccg-codegraph.md`
 - `~/.claude/bin/codeagent-wrapper`
+- `~/.claude/bin/osm` (decision-ledger launcher; runs this checkout's `bin/ccg.mjs` with the installing Node)
 - Permission allow entry for `codeagent-wrapper` in `~/.claude/settings.json`
+
+The decision ledger lives in `~/.claude/osm-ledger/`. It is created on the first recorded stage, and init, update and uninstall never modify or delete it.
 
 The installer does NOT modify agy settings in `~/.gemini/antigravity-cli/settings.json`.
 
@@ -52,6 +55,7 @@ node bin/ccg.mjs doctor
 ls ~/.claude/commands/osm
 ```
 - Expect no failures from `doctor`. Warnings (e.g. no native skill selection or MCP skipped) are allowed; only failures indicate an unsuccessful verification.
+- Run `~/.claude/bin/osm ledger status`; it should print `Ledger: on`. In doctor, `ledger.shim` is only ever pass or warn; on warn, rerun the install step from the current checkout.
 - Verify the five `/osm` commands (`init.md`, `research.md`, `plan.md`, `impl.md`, `review.md`) and skill commands are present in `~/.claude/commands/osm`.
 
 ## 5. Next Steps for User
@@ -64,7 +68,7 @@ Tell the user to:
 # Update
 cd ~/OpenSlime && git pull && pnpm install && pnpm build && node bin/ccg.mjs init --skip-prompt --skip-mcp --force
 
-# Uninstall
+# Uninstall (removes ~/.claude/bin/osm, keeps ~/.claude/osm-ledger)
 cd ~/OpenSlime && node bin/ccg.mjs uninstall
 ```
 

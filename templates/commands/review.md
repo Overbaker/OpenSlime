@@ -114,5 +114,7 @@ Review is complete when:
 - Check spec constraints: `rg -n "CONSTRAINT:|MUST|INVARIANT:" openspec/changes/<id>/specs/`
 - View implementation diff: `git diff`
 - Archive (after passing): `/osm:impl` → Step 8
+**Ledger**: after synthesizing, follow the Review section of `~/.claude/.ccg/prompts/claude/osm-ledger.md`: append outcomes for the plan and each impl phase, add at most 2 candidate lessons from confirmed findings, retire an adopted lesson that caused a Critical, and copy `~/.claude/bin/osm ledger harness` revisit lines (at most 5) into the report.
+
 **Stage report**: before finishing, write the `review` report as specified in `~/.claude/.ccg/prompts/claude/osm-report.md` (read it then; temporary file, includes a confidence estimate).
 <!-- CCG:SPEC:REVIEW:END -->

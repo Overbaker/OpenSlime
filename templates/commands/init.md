@@ -76,7 +76,11 @@ description: '初始化 OpenSpec (OPSX) 环境 + 验证多模型 MCP 工具'
      ```
    - For each unavailable tool, display warning with installation instructions.
 
-6. **Summary Report**
+6. **Decision Ledger**
+   - Run `~/.claude/bin/osm ledger status`. Report whether recording is on, the ledger root (`~/.claude/osm-ledger/`, kept on uninstall) and the project id. If the shim is missing, tell the user to rerun the OpenSlime installer, and say that stages then report `Ledger: unavailable`.
+   - To turn recording off: `~/.claude/bin/osm ledger off`. To read it without using session context: `~/.claude/bin/osm ledger summary` in your own terminal.
+
+7. **Summary Report**
    Display status table:
    ```
    Component                 Status

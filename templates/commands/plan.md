@@ -131,5 +131,9 @@ A change is ready for implementation only when:
 - List changes: `openspec list --json`
 - Search patterns: `rg -n "INVARIANT:|PROPERTY:" openspec/`
 - Use `AskUserQuestion` for ANY ambiguity—never assume
+**Lessons (advisory)**: at the start, run `~/.claude/bin/osm ledger lessons query --text "<requirement one-liner>"` once (at most 5 lines). Treat matching lessons as hints for this stage only; never pass lessons to external models here.
+
+**Ledger**: append a `human_decision` after each material `AskUserQuestion` answer, as specified in the Ledger section of `~/.claude/.ccg/prompts/claude/osm-report.md`.
+
 **Stage report**: before finishing, write the `plan` report as specified in `~/.claude/.ccg/prompts/claude/osm-report.md` (read it then; temporary file, includes a confidence estimate).
 <!-- CCG:SPEC:PLAN:END -->

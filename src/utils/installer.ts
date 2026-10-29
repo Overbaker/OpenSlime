@@ -11,6 +11,7 @@ import { readCcgConfig } from './config'
 import { installSkillCommands } from './skill-registry'
 import { syncSkills, installedNames, removeSkills } from './skill-manager'
 import { version as packageVersion } from '../../package.json'
+import { removeShim, writeShim } from './ledger/shim'
 
 // ═══════════════════════════════════════════════════════
 // Re-exports — all consumers import from './installer'
@@ -984,6 +985,16 @@ async function deregisterCcgHooks(installDir: string): Promise<boolean> {
   return true
 }
 
+/** `~/.claude/bin/osm`: the decision-ledger CLI that templates call without relying on PATH. */
+async function installLedgerShim(ctx: InstallContext): Promise<void> {
+  try {
+    await writeShim(ctx.installDir, join(PACKAGE_ROOT, 'bin', 'ccg.mjs'))
+  }
+  catch (error) {
+    ctx.result.errors.push(`Failed to write the osm ledger shim: ${error}`)
+  }
+}
+
 // ═══════════════════════════════════════════════════════
 // Public API: install / uninstall
 // ═══════════════════════════════════════════════════════
@@ -1058,6 +1069,7 @@ export async function installWorkflows(
   await installSkillGeneratedCommands(ctx)
   await installRuleFiles(ctx)
   await installBinaryFile(ctx)
+  await installLedgerShim(ctx)
 
   // ── Post-flight: validate installation produced results ──
   // Catch the case where all sub-steps silently returned empty
@@ -1088,6 +1100,9 @@ export interface UninstallResult {
   removedRules: boolean
   removedHooks: boolean
   removedBin: boolean
+  removedShim: boolean
+  /** The decision ledger is user data: uninstall never touches it and reports where it stays. */
+  ledgerPreserved: string | null
   errors: string[]
 }
 
@@ -1105,6 +1120,8 @@ export async function uninstallWorkflows(installDir: string, options?: { preserv
     removedRules: false,
     removedHooks: false,
     removedBin: false,
+    removedShim: false,
+    ledgerPreserved: null,
     errors: [],
   }
 
@@ -1191,6 +1208,16 @@ export async function uninstallWorkflows(installDir: string, options?: { preserv
       result.success = false
     }
   }
+
+  try {
+    result.removedShim = await removeShim(installDir)
+  }
+  catch (error) {
+    result.errors.push(`Failed to remove the osm ledger shim: ${error}`)
+    result.success = false
+  }
+  const ledgerDir = join(installDir, 'osm-ledger')
+  result.ledgerPreserved = await fs.pathExists(ledgerDir) ? ledgerDir : null
 
   // Remove .ccg config directory (engine, prompts, strategies all live here)
   if (await fs.pathExists(ccgConfigDir)) {

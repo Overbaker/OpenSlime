@@ -3,6 +3,7 @@ import fs from 'fs-extra'
 import { execFileSync } from 'node:child_process'
 import { homedir } from 'node:os'
 import { join } from 'pathe'
+import { shimPaths } from './ledger/shim'
 import { parse } from 'smol-toml'
 import { version } from '../../package.json'
 import type { SkillManagerOptions } from './skill-manager'
@@ -282,6 +283,18 @@ async function skillChecks(home: string, installDir: string, mode: DoctorReport[
   }))
 }
 
+/** The ledger never fails doctor: a missing or stale shim only means stages report `Ledger: unavailable`. */
+async function ledgerCheck(installDir: string): Promise<DoctorCheck> {
+  const shim = await shimPaths(installDir)
+  const fix = `Re-run ${FORK_UPDATE_COMMAND} from the current OpenSlime checkout.`
+  if (!shim) return check('ledger.shim', 'Decision ledger', 'warn', 'osm shim missing in ~/.claude/bin', fix)
+  if (!(await fs.pathExists(shim.entry))) return check('ledger.shim', 'Decision ledger', 'warn', `osm shim points to a missing checkout: ${shim.entry}`, fix)
+  if (!(await fs.pathExists(shim.node))) return check('ledger.shim', 'Decision ledger', 'warn', `osm shim points to a missing Node binary: ${shim.node}`, fix)
+  const root = join(installDir, 'osm-ledger')
+  const off = await fs.pathExists(join(root, 'disabled')) || process.env.OSM_LEDGER === '0'
+  return check('ledger.shim', 'Decision ledger', 'pass', `recording ${off ? 'off' : 'on'} · ${root}`)
+}
+
 export async function collectDoctorReport(deps: DoctorDependencies = {}): Promise<DoctorReport> {
   const home = deps.home || homedir()
   const installDir = deps.installDir || join(home, '.claude')
@@ -320,5 +333,6 @@ export async function collectDoctorReport(deps: DoctorDependencies = {}): Promis
   checks.push(...await backendChecks(names, pureClaude, home, geminiDir, platform, exec))
   checks.push(...await skillChecks(home, installDir, mode, deps))
   checks.push(await mcpCheck(home, codexDir, mode))
+  if (workflowInstalled) checks.push(await ledgerCheck(installDir))
   return { schemaVersion: 1, version, mode, backends: names, checks, failureCount: checks.filter(c => c.status === 'fail').length, warningCount: checks.filter(c => c.status === 'warn').length }
 }

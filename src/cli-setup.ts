@@ -8,12 +8,23 @@ import { configMcp } from './commands/config-mcp'
 import { doctor, status } from './commands/doctor'
 import { diagnoseMcp, fixMcp } from './commands/diagnose-mcp'
 import { init } from './commands/init'
+import { ledger } from './commands/ledger'
 import { update } from './commands/update'
 import { showMainMenu } from './commands/menu'
 import { registerSkillCommands } from './commands/skills'
 import { i18n, initI18n } from './i18n'
 import { readCcgConfig } from './utils/config'
 import { installCodexMode, uninstallCodexMode, uninstallWorkflows } from './utils/installer'
+
+/** cac coerces numeric-looking values (an all-digit event id, `--text 007`); read string options from argv as typed. */
+function rawOption(name: string, parsed: unknown): string | undefined {
+  const argv = process.argv
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === `--${name}` && i + 1 < argv.length && !argv[i + 1].startsWith('--')) return argv[i + 1]
+    if (argv[i].startsWith(`--${name}=`)) return argv[i].slice(name.length + 3)
+  }
+  return parsed == null ? undefined : String(parsed)
+}
 
 function customizeHelp(sections: any[]): any[] {
   sections.unshift({
@@ -32,6 +43,7 @@ function customizeHelp(sections: any[]): any[] {
       `  ${ansis.cyan('ccg doctor')}       Check installation health`,
       `  ${ansis.cyan('ccg status')}       Show installation overview`,
       `  ${ansis.cyan('ccg codex-mode')}   Install/uninstall Codex-Led mode`,
+      `  ${ansis.cyan('ccg ledger')}       Decision ledger (status, on/off, run-id, append)`,
       `  ${ansis.cyan('ccg uninstall')}    Uninstall CCG (non-interactive)`,
       '',
       ansis.gray(`  ${i18n.t('cli:help.shortcuts')}`),
@@ -164,6 +176,54 @@ export async function setupCommands(cli: CAC): Promise<void> {
     .command('status', 'Show CCG installation status')
     .action(async () => { await status() })
 
+  // Ledger: decisions, outcomes and lessons recorded at stage boundaries
+  cli
+    .command('ledger [...args]', 'Decision ledger: status, on/off, run-id, append, summary, harness, lessons')
+    .option('--json', 'Print JSON')
+    .option('--project-root <path>', 'Project to record for (default: cwd)')
+    .option('--project <id>', 'Summarize this project id')
+    .option('--all-projects', 'Summarize every project')
+    .option('--by-harness', 'Compare harness versions')
+    .option('--params', 'Print the built-in parameter set')
+    .option('--limit <n>', 'Max output lines')
+    .option('--max-bytes <n>', 'Max output bytes')
+    .option('--files <globs>', 'lessons query: changed files, comma-separated')
+    .option('--kind <kind>', 'lessons query: backend|frontend|any')
+    .option('--text <text>', 'lessons query: task description')
+    .option('--scope <scope>', 'lessons: project|global|both')
+    .option('--all', 'lessons query: include candidate and retired')
+    .option('--decision <event>', 'lessons adopt/promote: the recorded decision event id')
+    .option('--confirm', 'lessons adopt/promote: confirm the change')
+    .option('--reason <text>', 'lessons retire: why')
+    .option('--run-id <id>', 'lessons: run id for the state events')
+    .option('--change <id>', 'probes: change id')
+    .option('--lesson <id>', 'probes: lesson id')
+    .allowUnknownOptions()
+    .action(async (args: string[], options) => {
+      const code = await ledger(args.map(String), {
+        json: options.json,
+        projectRoot: rawOption('project-root', options.projectRoot),
+        project: rawOption('project', options.project),
+        allProjects: options.allProjects,
+        byHarness: options.byHarness,
+        params: options.params,
+        limit: options.limit,
+        maxBytes: options.maxBytes,
+        files: rawOption('files', options.files),
+        kind: rawOption('kind', options.kind),
+        text: rawOption('text', options.text),
+        scope: rawOption('scope', options.scope),
+        all: options.all,
+        decision: rawOption('decision', options.decision),
+        confirm: options.confirm,
+        reason: rawOption('reason', options.reason),
+        runId: rawOption('run-id', options.runId),
+        change: rawOption('change', options.change),
+        lesson: rawOption('lesson', options.lesson),
+      })
+      if (process.exitCode !== 130) process.exitCode = code
+    })
+
   // Codex mode: non-interactive install/uninstall
   cli
     .command('codex-mode <action>', 'Install or uninstall Codex-Led mode (non-interactive)')
@@ -208,6 +268,8 @@ export async function setupCommands(cli: CAC): Promise<void> {
         if (result.removedCommands.length > 0) console.log(ansis.gray(`  Commands: ${result.removedCommands.length} removed`))
         if (result.removedHooks) console.log(ansis.gray('  Hooks: removed'))
         if (result.removedBin) console.log(ansis.gray('  Binary: removed'))
+        if (result.removedShim) console.log(ansis.gray('  osm ledger shim: removed'))
+        if (result.ledgerPreserved) console.log(ansis.gray(`  Decision ledger kept: ${result.ledgerPreserved}`))
       }
       else {
         console.error(ansis.red('✗ Uninstall failed'))

@@ -31,9 +31,20 @@ models (Claude Opus/Fable, GPT-codex) already do better without it.
 - Antigravity requires the `permissions.allow` entry `"command(*)"` in `~/.gemini/antigravity-cli/settings.json`; without it headless agy denies shell tools and returns nothing. If missing, add `command(*)` only after user agreement; the installer does not modify agy settings.
 
 - research, plan and review always run codex and antigravity independently; a failed model is retried once, then skipped with lower confidence. No "never stop polling".
-- `/osm:impl`: codex writes backend, antigravity writes frontend, each inside an explicit file allow-list (the wrapper already runs them with write access). Claude supervises and reviews; it fixes only mechanical ≤5-line issues itself and sends logic changes back to the writer via `resume`. Opt-in `--compare` runs one subagent in an isolated worktree that picks its own writer (itself or antigravity) and skill. Every stage ends with a temporary report with a confidence estimate.
+- `/osm:impl`: codex writes backend, antigravity writes frontend, each inside an explicit file allow-list (the wrapper already runs them with write access). Claude supervises and reviews; it fixes only mechanical ≤5-line issues itself and sends logic changes back to the writer via `resume`. A trial lesson is tried automatically on a challenger that is identical to the main writer except for one brief line. These probes are budgeted, blind and scored A/B. `--compare` forces one; `--compare explore` keeps the old self-routing subagent, which is never credited to a lesson. Every stage ends with a temporary report that includes a confidence estimate.
 - Commands are `/osm:init|research|plan|impl|review`; the non-OpenSpec legacy commands are removed.
 - Reviews run in a fresh session and every finding needs a concrete failing case (`prompts/*/reviewer.md`, adapted from [ponytail-review](https://github.com/DietrichGebert/ponytail), MIT).
+
+## Added: decision ledger and lessons
+
+- `~/.claude/osm-ledger/` holds an append-only, user-local JSONL ledger with one file per project. It is written only at stage boundaries: stage confidence, human decisions, probes, later outcomes and lesson state. Nothing runs per turn and there are no hooks.
+- `~/.claude/bin/osm ledger summary | harness | lessons …` is deterministic, makes no model calls, and caps its output.
+- Lessons follow [Harness²](https://github.com/google-research/harness2), kept small:
+  - A lesson is one evidence-backed brief line.
+  - While on trial it is used only by a single-variable challenger.
+  - It is adopted only after the human answers a blind pick and then a reveal.
+  - It retires automatically when the evidence goes against it.
+- OpenSlime's own prompts and parameters are fingerprinted on every event. Its built-in rules (H-0001…H-0005) are registered as adopted lessons that evidence can flag for revisit.
 
 ## Output styles
 

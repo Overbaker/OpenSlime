@@ -970,6 +970,7 @@ async function uninstall(): Promise<void> {
 
   if (result.success) {
     console.log(ansis.green(`  ✅ ${i18n.t('menu:uninstall.success')}`))
+    if (result.ledgerPreserved) console.log(ansis.gray(`  Decision ledger kept: ${result.ledgerPreserved}`))
 
     if (result.removedCommands.length > 0) {
       console.log()
