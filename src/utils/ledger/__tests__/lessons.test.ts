@@ -149,12 +149,15 @@ describe('P11: lifecycle legality and thresholds', () => {
 })
 
 describe('P12: bounded query', () => {
-  it('returns at most `limit` lines of ≤200 chars from 10,000 entries, and finds a lesson missing from a stale INDEX', () => {
+  it('returns at most `limit` lines of ≤200 chars from 10,000 entries, and finds a lesson missing from a stale INDEX', async () => {
     const s = setup()
     addLesson(lessonInput(s.evidence), s.lopts)
     const dir = lessonsDir(s.root, 'project', s.project.id)
     const template = readLessons(dir)[0]
-    for (let i = 2; i <= 10_000; i++) writeFileSync(join(dir, 'entries', `L-${String(i).padStart(5, '0')}.md`), serializeLesson({ ...template, id: `L-${String(i).padStart(5, '0')}`, line: `rule ${i} ${'x'.repeat(300)}`, cue: 'é'.repeat(150) }))
+    for (let i = 2; i <= 10_000; i++) {
+      if (i % 500 === 0) await new Promise(r => setImmediate(r))
+      writeFileSync(join(dir, 'entries', `L-${String(i).padStart(5, '0')}.md`), serializeLesson({ ...template, id: `L-${String(i).padStart(5, '0')}`, line: `rule ${i} ${'x'.repeat(300)}`, cue: 'é'.repeat(150) }))
+    }
     writeFileSync(join(dir, 'INDEX.md'), '')
     const q = { files: ['src/a/parser.ts'], kind: 'backend' as const, text: 'fix parser', scope: 'both' as const, limit: 5, all: true }
     const { rows, matched } = queryLessons(s.root, s.project.id, s.events(), q)
@@ -300,14 +303,18 @@ describe('review fixes', () => {
     expect(two.map(r => r.lesson.id)).toEqual(['L-0001'])
   })
 
-  it('P12: every printed line is ≤200 chars for limits 1, 5, 20 and libraries of 0, 1 and 10,000', () => {
+  it('P12: every printed line is ≤200 chars for limits 1, 5, 20 and libraries of 0, 1 and 10,000', async () => {
     for (const size of [0, 1, 10_000]) {
       const s = setup(`size${size}`)
       const dir = lessonsDir(s.root, 'project', s.project.id)
       if (size) addLesson(lessonInput(s.evidence, { line: `r ${'x'.repeat(150)}` }), s.lopts)
       const tpl = readLessons(dir)[0]
-      for (let i = 2; i <= size; i++) writeFileSync(join(dir, 'entries', `L-${String(i).padStart(5, '0')}.md`), serializeLesson({ ...tpl, id: `L-${String(i).padStart(5, '0')}`, line: `rule ${i} ${'é'.repeat(158)}` }))
+      for (let i = 2; i <= size; i++) {
+        if (i % 500 === 0) await new Promise(r => setImmediate(r))
+        writeFileSync(join(dir, 'entries', `L-${String(i).padStart(5, '0')}.md`), serializeLesson({ ...tpl, id: `L-${String(i).padStart(5, '0')}`, line: `rule ${i} ${'é'.repeat(158)}` }))
+      }
       for (const limit of [1, 5, 20]) {
+        await new Promise(r => setImmediate(r))
         const { rows } = queryLessons(s.root, s.project.id, s.events(), q({ limit, kind: 'backend', all: true }))
         expect(rows.length).toBe(Math.min(limit, size))
         for (const r of rows) expect([...queryLine(r)].length).toBeLessThanOrEqual(200)

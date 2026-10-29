@@ -75,13 +75,15 @@ describe('appendEvent', () => {
     expect(readFileSync(log).equals(bytes)).toBe(true)
   })
 
-  it('P4: a torn tail at any offset leaves complete lines readable and the next append intact', () => {
+  // Long synchronous loops yield now and then so the vitest worker can keep reporting on slow CI runners.
+  it('P4: a torn tail at any offset leaves complete lines readable and the next append intact', async () => {
     const { opts, log } = setup()
     appendEvent(stageEvent(), opts)
     appendEvent(decisionEvent(), opts)
     const full = readFileSync(log)
     const firstEnd = full.indexOf(0x0A) + 1
     for (let offset = 0; offset < full.length; offset++) {
+      if (offset % 50 === 0) await new Promise(r => setImmediate(r))
       writeFileSync(log, full)
       truncateSync(log, offset)
       const before = readLog(log)
