@@ -226,3 +226,15 @@ describe('lesson state cannot be forged through append', () => {
     expect(r.stderr).toContain('written only by `osm ledger lessons`')
   }, 30_000)
 })
+
+describe('osm ledger position', () => {
+  it('prints the recommended index and rejects missing or out-of-range arguments', async () => {
+    const { recommendedIndex } = await import('../store')
+    const ok = await osm(['position', '--run-id', 'r-1', '--decision-id', 'q1', '--options', '3'], null)
+    expect(ok.code).toBe(0)
+    expect(Number(ok.stdout.trim())).toBe(recommendedIndex('r-1', 'q1', 3))
+    expect((await osm(['position', '--run-id', 'r-1', '--options', '3'], null)).code).toBe(2)
+    expect((await osm(['position', '--run-id', 'r-1', '--decision-id', 'q1', '--options', '9'], null)).code).toBe(2)
+  }, 60_000)
+})
+

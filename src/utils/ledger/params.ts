@@ -60,6 +60,18 @@ export const PARAMS = deepFreeze({
     displayMaxLines: 12,
     blindInterdiffMaxLines: 20,
   },
+  stats: {
+    alpha: 0.05,
+    minN: 10,
+    minRuns: 5,
+    zMax: 8,
+    bisectIters: 60,
+    maxRows: 20,
+  },
+  render: {
+    maxItems: 6,
+    nameMax: 32,
+  },
   harnessRules: {
     calibrationGap: 0.15,
     calibrationMinN: 20,

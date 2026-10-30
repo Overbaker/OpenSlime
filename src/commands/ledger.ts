@@ -15,7 +15,7 @@ import { cohorts, cohortView, evaluateRules } from '../utils/ledger/rules'
 import { byCodePoint, summarize } from '../utils/ledger/summary'
 import { defaultInstallDir, defaultLedgerRoot, disabledMarker, globalLog, projectLog } from '../utils/ledger/paths'
 import { resolveProject } from '../utils/ledger/project'
-import { appendEvent, EXIT, ledgerDisabled, lockInfo, readLog } from '../utils/ledger/store'
+import { appendEvent, EXIT, ledgerDisabled, lockInfo, readLog, recommendedIndex } from '../utils/ledger/store'
 
 export interface LedgerOptions {
   json?: boolean
@@ -39,6 +39,8 @@ export interface LedgerOptions {
   runId?: string
   change?: string
   lesson?: string
+  decisionId?: string
+  options?: string
 }
 
 const USAGE = [
@@ -51,6 +53,7 @@ const USAGE = [
   '  harness [--params] [--json]    built-in rules H-0001..H-0005 and the current install digest',
   '  lessons query [--files a,b] [--kind backend|frontend|any] [--text S] [--scope project|global|both] [--limit N] [--all]',
   '  probes --change ID [--lesson ID --scope S]   probe counts for the impl budget',
+  '  position --run-id R --decision-id D --options K   where a randomized recommendation goes (0-based)',
   '  lessons show ID [--scope S] | add (stdin JSON) | adopt ID --decision EVENT --confirm | retire ID --reason S | promote ID --decision EVENT --confirm',
 ].join('\n')
 
@@ -381,6 +384,14 @@ function run(args: string[], opts: LedgerOptions): number {
       return lessonsCmd(args, opts, root)
     case 'probes':
       return probesCmd(opts, root)
+    case 'position': {
+      const k = Number(opts.options)
+      if (!opts.runId || !opts.decisionId || !Number.isInteger(k) || k < PARAMS.append.minOptions || k > PARAMS.append.maxOptions) {
+        throw new BoundsError(`position: --run-id, --decision-id and --options ${PARAMS.append.minOptions}..${PARAMS.append.maxOptions} are required`)
+      }
+      out(String(recommendedIndex(opts.runId, opts.decisionId, k)))
+      return EXIT.ok
+    }
     default:
       process.stderr.write(`${cmd ? `Unknown ledger command: ${cmd}\n` : ''}${USAGE}\n`)
       return EXIT.invalid

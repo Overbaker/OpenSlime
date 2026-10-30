@@ -198,6 +198,8 @@ export async function setupCommands(cli: CAC): Promise<void> {
     .option('--run-id <id>', 'lessons: run id for the state events')
     .option('--change <id>', 'probes: change id')
     .option('--lesson <id>', 'probes: lesson id')
+    .option('--decision-id <id>', 'position: decision id')
+    .option('--options <k>', 'position: number of options shown')
     .allowUnknownOptions()
     .action(async (args: string[], options) => {
       const code = await ledger(args.map(String), {
@@ -220,6 +222,8 @@ export async function setupCommands(cli: CAC): Promise<void> {
         runId: rawOption('run-id', options.runId),
         change: rawOption('change', options.change),
         lesson: rawOption('lesson', options.lesson),
+        decisionId: rawOption('decision-id', options.decisionId),
+        options: rawOption('options', options.options),
       })
       if (process.exitCode !== 130) process.exitCode = code
     })

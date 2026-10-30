@@ -70,7 +70,7 @@ export interface LedgerEvent extends EventInput {
   producer: string
   harness: Harness
   /** Observed environment snapshot, computed by the CLI on stage_completed; never supplied by callers. */
-  context?: Record<string, unknown>
+  context?: object
 }
 
 export class ValidationError extends Error {}

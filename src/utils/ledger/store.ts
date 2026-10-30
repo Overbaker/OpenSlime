@@ -4,6 +4,8 @@ import { hostname } from 'node:os'
 import { randomUUID } from 'node:crypto'
 import { dirname, join } from 'pathe'
 import { canonicalJson, sha256Hex } from './canonical'
+import type { ObservedContext } from './context'
+import { computeContext } from './context'
 import { computeHarness } from './harness'
 import { PARAMS } from './params'
 import { defaultInstallDir, defaultLedgerRoot, disabledMarker, globalLog, projectDir, projectLog } from './paths'
@@ -305,6 +307,10 @@ export interface LockedContext {
   root: string
   path: string
   project: ProjectIdentity
+  /** Where the project was resolved from; used to locate files for the observed context, never stored. */
+  projectRoot: string
+  /** Observed context computed before the lock is taken, so the lock is never held for file scans. */
+  context?: ObservedContext
   installDir: string
   version: string
   now: Date
@@ -342,6 +348,7 @@ export function commitLocked(ctx: LockedContext, input: EventInput): AppendResul
     operation_key: input.operation_key,
     producer: ctx.version,
     harness: computeHarness(input, ctx.installDir, ctx.version),
+    ...(input.kind === 'stage_completed' ? { context: ctx.context ?? computeContext({ installDir: ctx.installDir, projectRoot: ctx.projectRoot }) } : {}),
     payload,
   }
   if (existing) {
@@ -349,7 +356,12 @@ export function commitLocked(ctx: LockedContext, input: EventInput): AppendResul
     if (ctx.meta) writeMetaOnce(ctx.meta, ctx.project.name, ctx.now)
     return { code: 0, receipt: { status: 'duplicate', event_id: id } }
   }
-  const line = JSON.stringify(event)
+  let line = JSON.stringify(event)
+  // The observed context must never fail an append: drop it when it alone would push the line past the cap.
+  if (Buffer.byteLength(line) + 1 > PARAMS.append.maxLineBytes && 'context' in event) {
+    delete (event as { context?: object }).context
+    line = JSON.stringify(event)
+  }
   if (Buffer.byteLength(line) + 1 > PARAMS.append.maxLineBytes) return { code: EXIT.invalid, error: `event exceeds ${PARAMS.append.maxLineBytes} bytes` }
   appendLine(ctx.path, line)
   if (ctx.meta) writeMetaOnce(ctx.meta, ctx.project.name, ctx.now)
@@ -375,6 +387,7 @@ export function resolveContext(opts: AppendOptions): ResolveResult {
       root,
       path: global ? globalLog(root) : projectLog(root, project.id),
       project,
+      projectRoot: opts.projectRoot ?? process.cwd(),
       installDir: opts.installDir ?? (opts.env ?? process.env).OSM_INSTALL_DIR ?? defaultInstallDir(),
       version: opts.version,
       now: opts.now?.() ?? new Date(),
@@ -418,6 +431,7 @@ export function appendEvent(raw: unknown, opts: AppendOptions): AppendResult {
   const resolved = resolveContext(opts)
   if (!resolved.ok) return resolved.result
   const { ctx } = resolved
+  if (input.kind === 'stage_completed') ctx.context = computeContext({ installDir: ctx.installDir, projectRoot: ctx.projectRoot })
   return underLock(ctx, () => {
     const result = commitLocked(ctx, input)
     if (result.code !== 0 || !opts.after) return result
