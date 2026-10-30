@@ -237,9 +237,54 @@ function writeMetaOnce(path: string, name: string, now: Date): void {
 }
 
 function comparable(e: Pick<EventInput, 'payload'> & Record<string, unknown>): string {
-  const { seq, recorded_at, event_id, producer, harness, ...rest } = e as Record<string, any>
+  const { seq, recorded_at, event_id, producer, harness, context, ...rest } = e as Record<string, any>
   const { target_event_id, ...payload } = rest.payload ?? {}
   return canonicalJson({ ...rest, payload })
+}
+
+const OPTIONAL_PAYLOAD: Record<string, readonly string[]> = {
+  stage_completed: ['ai_decisions', 'change_kind'],
+  human_decision: ['dimension', 'position'],
+  probe: ['writer', 'change_kind'],
+}
+const OPTIONAL_INVOCATION = ['model', 'mcp_tools', 'practices', 'cost'] as const
+
+function dropNull(o: Record<string, any>, keys: readonly string[]): void {
+  for (const k of keys) if (o[k] === null) delete o[k]
+}
+
+/**
+ * Stores each optional field added under v1 in one form only, on a copy (the caller's object is untouched):
+ * an explicit null becomes absent; `ai_decisions: {}` becomes absent; a cost member left out becomes null,
+ * and a cost with both members null is dropped.
+ */
+export function normalizeOptional(source: EventInput): EventInput {
+  const input = structuredClone(source)
+  dropNull(input.payload, OPTIONAL_PAYLOAD[input.kind] ?? [])
+  if (input.kind !== 'stage_completed') return input
+  if (input.payload.ai_decisions && Object.keys(input.payload.ai_decisions).length === 0) delete input.payload.ai_decisions
+  for (const inv of input.payload.invocations as Record<string, any>[]) {
+    dropNull(inv, OPTIONAL_INVOCATION)
+    if (!inv.cost) continue
+    inv.cost = { tokens: inv.cost.tokens ?? null, usd: inv.cost.usd ?? null }
+    if (inv.cost.tokens === null && inv.cost.usd === null) delete inv.cost
+  }
+  return input
+}
+
+/** The index a `run-hash-v1` decision must show its recommendation at. */
+export function recommendedIndex(runId: string, decisionId: string, options: number): number {
+  return Number.parseInt(sha256Hex(`${runId}\0${decisionId}`, 8), 16) % options
+}
+
+function checkPosition(input: EventInput): string | null {
+  const p = input.payload
+  if (input.kind !== 'human_decision' || p.position !== 'run-hash-v1') return null
+  if (p.recommendation === null) return 'event.payload.position: run-hash-v1 requires a recommendation'
+  if (p.blind !== false) return 'event.payload.position: run-hash-v1 requires blind false'
+  const want = recommendedIndex(input.run_id, p.decision_id, p.options.length)
+  if (p.options.indexOf(p.recommendation) !== want) return `event.payload.position: recommendation must be at index ${want}`
+  return null
 }
 
 export interface AppendOptions {
@@ -268,6 +313,10 @@ export interface LockedContext {
 
 /** Appends one validated event; the caller must hold the lock on `ctx.path`. */
 export function commitLocked(ctx: LockedContext, input: EventInput): AppendResult {
+  // Every writer gets the same canonical form and position check, not only appendEvent.
+  input = normalizeOptional(input)
+  const misplaced = checkPosition(input)
+  if (misplaced) return { code: EXIT.invalid, error: misplaced }
   const id = eventId(ctx.project.id, input.run_id, input.kind, input.operation_key)
   const { maxSeq, existing, stageEvents } = scanLog(ctx.path, id, input.kind === 'outcome')
   const payload = { ...input.payload }

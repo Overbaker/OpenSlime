@@ -4,9 +4,19 @@ export const STAGES = ['research', 'plan', 'impl', 'review', 'lesson'] as const
 export const KINDS = ['stage_completed', 'human_decision', 'probe', 'outcome', 'lesson_state'] as const
 export const LESSON_STATES = ['candidate', 'trial', 'adopted', 'retired'] as const
 export const SKIP_REASONS = ['dirty-base', 'budget', 'no-verify', 'ledger-off', 'suppressed'] as const
+export const DIMENSIONS = ['scope', 'design', 'backend', 'skill', 'permissions', 'acceptance', 'adoption'] as const
+export const CHANGE_KINDS = ['feature', 'fix', 'refactor', 'docs', 'test', 'chore'] as const
+export const POSITIONS = ['run-hash-v1'] as const
 
 export type Stage = typeof STAGES[number]
 export type Kind = typeof KINDS[number]
+export type Dimension = typeof DIMENSIONS[number]
+export type ChangeKind = typeof CHANGE_KINDS[number]
+
+export interface Cost {
+  tokens: number | null
+  usd: number | null
+}
 
 export interface Invocation {
   backend: string
@@ -16,6 +26,10 @@ export interface Invocation {
   accepted: number | null
   rejected: number | null
   unadjudicated: number | null
+  model?: string
+  mcp_tools?: string[]
+  practices?: string[]
+  cost?: Cost
 }
 
 export interface ProbeCandidate {
@@ -55,6 +69,8 @@ export interface LedgerEvent extends EventInput {
   project_id: string
   producer: string
   harness: Harness
+  /** Observed environment snapshot, computed by the CLI on stage_completed; never supplied by callers. */
+  context?: Record<string, unknown>
 }
 
 export class ValidationError extends Error {}
@@ -95,8 +111,8 @@ function str(v: unknown, path: string, max: number = PARAMS.append.maxText): str
   return v
 }
 
-function id(v: unknown, path: string): string {
-  const s = str(v, path, 200)
+function id(v: unknown, path: string, max = 200): string {
+  const s = str(v, path, max)
   if (s.length === 0) fail(path, 'must not be empty')
   // eslint-disable-next-line no-control-regex
   if (/[\u0000-\u001F\u007F]/.test(s)) fail(path, 'must not contain control characters')
@@ -140,10 +156,61 @@ function obj(v: unknown, path: string, keys: readonly string[], optional: readon
 }
 
 const SLUG = /^[a-z0-9][a-z0-9_-]*$/
-function slug(v: unknown, path: string): string {
-  const s = id(v, path)
+function slug(v: unknown, path: string, max = 200): string {
+  const s = id(v, path, max)
   if (!SLUG.test(s)) fail(path, 'expected lowercase slug')
   return s
+}
+
+/** Optional fields added under schema_version 1: absent or null both mean not reported. */
+function optional(o: Obj, key: string, path: string, check: (v: unknown, path: string) => unknown): void {
+  if (o[key] !== undefined && o[key] !== null) check(o[key], `${path}.${key}`)
+}
+
+function unique(values: string[], path: string): void {
+  if (new Set(values).size !== values.length) fail(path, 'must be unique')
+}
+
+const MCP_PART = /^[\w.-]{1,64}$/
+const MCP_PREFIXED = /^mcp__(.+?)__(.+)$/
+
+/** `<server>:<tool>`; Claude Code's `mcp__server__tool` form is normalized to it. */
+function mcpTool(v: unknown, path: string): string {
+  if (typeof v !== 'string') fail(path, 'expected string')
+  const m = MCP_PREFIXED.exec(v)
+  const name = m ? `${m[1]}:${m[2]}` : v
+  const parts = name.split(':')
+  if (parts.length !== 2 || !parts.every(x => MCP_PART.test(x))) fail(path, 'expected <server>:<tool>')
+  return name
+}
+
+function cost(v: unknown, path: string): Obj {
+  // Either member may be left out ("leave a field out rather than estimate"); append fills it in as null.
+  const o = obj(v, path, [], ['tokens', 'usd'])
+  if (!('tokens' in o) && !('usd' in o)) fail(path, 'expected tokens and/or usd')
+  if ('tokens' in o) nullable(o.tokens, `${path}.tokens`, (x, q) => int(x, q, 0, 1e10))
+  if ('usd' in o) nullable(o.usd, `${path}.usd`, (x, q) => {
+    if (typeof x !== 'number' || !Number.isFinite(x) || x < 0 || x > 1e4 || Number(x.toFixed(6)) !== x) fail(q, 'expected number 0..10000 with at most 6 decimals')
+    return x
+  })
+  return o
+}
+
+function aiDecisions(v: unknown, path: string): Obj {
+  if (!isObj(v)) fail(path, 'expected object')
+  for (const k of Object.keys(v)) {
+    oneOf(k, `${path}.${k}`, DIMENSIONS)
+    int(v[k], `${path}.${k}`, 0, 1000)
+  }
+  return v
+}
+
+function writer(v: unknown, path: string): Obj {
+  const o = obj(v, path, ['backend', 'role', 'model'])
+  slug(o.backend, `${path}.backend`)
+  slug(o.role, `${path}.role`)
+  nullable(o.model, `${path}.model`, (x, q) => id(x, q, 64))
+  return o
 }
 
 export function confidenceBand(percent: number): 'Low' | 'Medium' | 'High' {
@@ -151,7 +218,7 @@ export function confidenceBand(percent: number): 'Low' | 'Medium' | 'High' {
 }
 
 function stageCompleted(p: unknown, path: string): Obj {
-  const o = obj(p, path, ['status', 'confidence', 'verify', 'invocations'])
+  const o = obj(p, path, ['status', 'confidence', 'verify', 'invocations'], ['ai_decisions', 'change_kind'])
   oneOf(o.status, `${path}.status`, ['completed', 'failed', 'blocked', 'cancelled'])
   const c = obj(o.confidence, `${path}.confidence`, ['percent'], ['band'])
   const percent = int(c.percent, `${path}.confidence.percent`, 0, 95)
@@ -159,23 +226,33 @@ function stageCompleted(p: unknown, path: string): Obj {
   c.band = confidenceBand(percent)
   nullable(o.verify, `${path}.verify`, (v, q) => oneOf(v, q, ['passed', 'failed', 'not_run']))
   arr(o.invocations, `${path}.invocations`, (v, q) => {
-    const inv = obj(v, q, ['backend', 'role', 'skills', 'status', 'accepted', 'rejected', 'unadjudicated'])
+    const inv = obj(v, q, ['backend', 'role', 'skills', 'status', 'accepted', 'rejected', 'unadjudicated'], ['model', 'mcp_tools', 'practices', 'cost'])
     slug(inv.backend, `${q}.backend`)
     slug(inv.role, `${q}.role`)
     arr(inv.skills, `${q}.skills`, id)
     oneOf(inv.status, `${q}.status`, ['succeeded', 'failed', 'skipped'])
     for (const k of ['accepted', 'rejected', 'unadjudicated']) nullable(inv[k], `${q}.${k}`, (x, r) => int(x, r))
+    optional(inv, 'model', q, (x, r) => id(x, r, 64))
+    optional(inv, 'mcp_tools', q, (x, r) => {
+      const tools = arr(x, r, mcpTool, 0, 20)
+      unique(tools, r)
+      inv.mcp_tools = tools
+    })
+    optional(inv, 'practices', q, (x, r) => unique(arr(x, r, (y, t) => slug(y, t, 40), 0, 10), r))
+    optional(inv, 'cost', q, cost)
     return inv
   })
+  optional(o, 'ai_decisions', path, aiDecisions)
+  optional(o, 'change_kind', path, (v, q) => oneOf(v, q, CHANGE_KINDS))
   return o
 }
 
 function humanDecision(p: unknown, path: string): Obj {
-  const o = obj(p, path, ['decision_id', 'topic', 'options', 'recommendation', 'initial_choice', 'final_choice', 'final_position', 'blind'])
+  const o = obj(p, path, ['decision_id', 'topic', 'options', 'recommendation', 'initial_choice', 'final_choice', 'final_position', 'blind'], ['dimension', 'position'])
   id(o.decision_id, `${path}.decision_id`)
   str(o.topic, `${path}.topic`, PARAMS.append.maxTopic)
   const options = arr(o.options, `${path}.options`, id, PARAMS.append.minOptions, PARAMS.append.maxOptions)
-  if (new Set(options).size !== options.length) fail(`${path}.options`, 'must be unique')
+  unique(options, `${path}.options`)
   const choice = (v: unknown, q: string) => {
     const s = id(v, q)
     if (!options.includes(s)) fail(q, 'must be one of options')
@@ -189,16 +266,20 @@ function humanDecision(p: unknown, path: string): Obj {
     fail(`${path}.final_position`, 'must be the index of final_choice in options')
   }
   bool(o.blind, `${path}.blind`)
+  optional(o, 'dimension', path, (v, q) => oneOf(v, q, DIMENSIONS))
+  optional(o, 'position', path, (v, q) => oneOf(v, q, POSITIONS))
   return o
 }
 
 function probe(p: unknown, path: string): Obj {
-  const o = obj(p, path, ['lesson_id', 'lesson_scope', 'mode', 'skip_reason', 'candidates', 'interdiff_lines', 'ab_map_recorded_after_reviews', 'landed', 'forced'])
+  const o = obj(p, path, ['lesson_id', 'lesson_scope', 'mode', 'skip_reason', 'candidates', 'interdiff_lines', 'ab_map_recorded_after_reviews', 'landed', 'forced'], ['writer', 'change_kind'])
   nullable(o.lesson_id, `${path}.lesson_id`, id)
   nullable(o.lesson_scope, `${path}.lesson_scope`, (v, q) => oneOf(v, q, ['project', 'global']))
   if ((o.lesson_id === null) !== (o.lesson_scope === null)) fail(`${path}.lesson_scope`, 'set together with lesson_id')
   oneOf(o.mode, `${path}.mode`, ['lesson', 'explore'])
   bool(o.forced, `${path}.forced`)
+  optional(o, 'writer', path, writer)
+  optional(o, 'change_kind', path, (v, q) => oneOf(v, q, CHANGE_KINDS))
   if (o.mode === 'lesson' && o.lesson_id === null) fail(`${path}.lesson_id`, 'required for a lesson probe')
   if (o.mode === 'explore' && o.lesson_id !== null) fail(`${path}.lesson_id`, 'must be null for an explore probe')
   const skip = nullable(o.skip_reason, `${path}.skip_reason`, (v, q) => oneOf(v, q, SKIP_REASONS))
@@ -267,6 +348,7 @@ const INPUT_KEYS = ['schema_version', 'run_id', 'change_id', 'stage', 'phase_id'
 
 /** Validates a caller-supplied event. Fields the CLI assigns (ids, seq, timestamps, harness) are rejected. */
 export function validateInput(raw: unknown): EventInput {
+  if (isObj(raw) && 'context' in raw) fail('event.context', 'assigned by the CLI')
   const o = obj(raw, 'event', INPUT_KEYS)
   if (o.schema_version !== 1) fail('event.schema_version', 'must be 1')
   id(o.run_id, 'event.run_id')
@@ -288,6 +370,7 @@ export function isStoredEvent(raw: unknown): raw is LedgerEvent {
   if (typeof e.event_id !== 'string' || !Number.isInteger(e.seq) || typeof e.recorded_at !== 'string' || typeof e.project_id !== 'string') return false
   if (!isObj(e.harness) || typeof e.harness.install !== 'string' || typeof e.harness.digest !== 'string' || typeof e.harness.params !== 'string' || !isObj(e.harness.files)) return false
   if (!isObj(e.payload)) return false
+  if ('context' in e && !isObj(e.context)) return false
   const { target_event_id, ...payload } = e.payload
   if (e.kind === 'outcome' && typeof target_event_id !== 'string') return false
   enforceCaps = false

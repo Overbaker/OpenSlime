@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { isStoredEvent, ValidationError, validateInput } from '../schema'
-import { decisionEvent, probeEvent, stageEvent } from './fixtures'
+import { CHANGE_KINDS, DIMENSIONS, isStoredEvent, ValidationError, validateInput } from '../schema'
+import { summarize } from '../summary'
+import { decision, inv, outcome, probe, stage } from './events'
+import { decisionEvent, mulberry32, probeEvent, shuffleKeys, stageEvent } from './fixtures'
 
 function rejects(event: unknown, match: RegExp): void {
   expect(() => validateInput(event)).toThrow(ValidationError)
@@ -164,5 +166,152 @@ describe('isStoredEvent', () => {
     badFiles.harness = { ...badFiles.harness, files: 'ab' as any }
     expect(isStoredEvent(badFiles)).toBe(false)
     expect(() => validateInput({ ...decisionEvent(), payload: { ...decisionEvent().payload, topic: 'x'.repeat(500) } })).toThrow(/longer than 200/)
+  })
+})
+
+describe('ledger dimensions: optional v1 fields', () => {
+  const full = () => {
+    const e = stageEvent()
+    Object.assign(e.payload.invocations[0], { model: 'claude-opus-5-5', mcp_tools: ['context7:query-docs'], practices: ['tdd', 'pbt'], cost: { tokens: 1200, usd: 0.012345 } })
+    Object.assign(e.payload, { ai_decisions: { design: 2, skill: 0 }, change_kind: 'feature' })
+    return e
+  }
+
+  it('accepts every new field, and null as not reported', () => {
+    expect(() => validateInput(full())).not.toThrow()
+    expect(() => validateInput(decisionEvent({ payload: { ...decisionEvent().payload, dimension: 'design', position: 'run-hash-v1' } }))).not.toThrow()
+    expect(() => validateInput(probeEvent({ payload: { ...probeEvent().payload, writer: { backend: 'codex', role: 'builder', model: null }, change_kind: 'fix' } }))).not.toThrow()
+    const nulls = stageEvent()
+    Object.assign(nulls.payload.invocations[0], { model: null, mcp_tools: null, practices: null, cost: null })
+    Object.assign(nulls.payload, { ai_decisions: null, change_kind: null })
+    expect(() => validateInput(nulls)).not.toThrow()
+    expect(() => validateInput(decisionEvent({ payload: { ...decisionEvent().payload, dimension: null, position: null } }))).not.toThrow()
+    expect(() => validateInput(probeEvent({ payload: { ...probeEvent().payload, writer: null, change_kind: null } }))).not.toThrow()
+  })
+
+  it('normalizes mcp__server__tool to server:tool and keeps names unique', () => {
+    const e = full()
+    e.payload.invocations[0].mcp_tools = ['mcp__context7__query-docs', 'github:search_code']
+    expect(validateInput(e).payload.invocations[0].mcp_tools).toEqual(['context7:query-docs', 'github:search_code'])
+    e.payload.invocations[0].mcp_tools = ['mcp__context7__query-docs', 'context7:query-docs']
+    rejects(e, /mcp_tools: must be unique/)
+    for (const bad of ['context7', 'a:b:c', ':tool', 'srv:', 'sp ace:t', `${'s'.repeat(65)}:t`, 'mcp__x', 7]) {
+      e.payload.invocations[0].mcp_tools = [bad]
+      rejects(e, /expected <server>:<tool>|expected string/)
+    }
+    e.payload.invocations[0].mcp_tools = Array.from({ length: 21 }, (_, i) => `s:t${i}`)
+    rejects(e, /mcp_tools: expected 0..20 items/)
+  })
+
+  it('enforces model, practices and cost caps', () => {
+    const cases: Array<[(e: any) => void, RegExp]> = [
+      [e => { e.payload.invocations[0].model = 'm'.repeat(65) }, /model: longer than 64/],
+      [e => { e.payload.invocations[0].model = '' }, /model: must not be empty/],
+      [e => { e.payload.invocations[0].practices = Array.from({ length: 11 }, (_, i) => `p${i}`) }, /practices: expected 0..10 items/],
+      [e => { e.payload.invocations[0].practices = ['tdd', 'tdd'] }, /practices: must be unique/],
+      [e => { e.payload.invocations[0].practices = ['p'.repeat(41)] }, /longer than 40/],
+      [e => { e.payload.invocations[0].practices = ['Plan First'] }, /lowercase slug/],
+      [e => { e.payload.invocations[0].cost = {} }, /expected tokens and\/or usd/],
+      [e => { e.payload.invocations[0].cost = { tokens: 1e10 + 1, usd: null } }, /tokens: expected integer/],
+      [e => { e.payload.invocations[0].cost = { tokens: 1.5, usd: null } }, /tokens: expected integer/],
+      [e => { e.payload.invocations[0].cost = { tokens: null, usd: 10000.5 } }, /usd: expected number/],
+      [e => { e.payload.invocations[0].cost = { tokens: null, usd: -1 } }, /usd: expected number/],
+      [e => { e.payload.invocations[0].cost = { tokens: null, usd: 0.1234567 } }, /at most 6 decimals/],
+      [e => { e.payload.invocations[0].cost = { tokens: null, usd: 1, eur: 1 } }, /cost\.eur: unknown field/],
+      [e => { e.payload.ai_decisions = { design: 1001 } }, /ai_decisions\.design: expected integer 0..1000/],
+      [e => { e.payload.ai_decisions = { design: null } }, /ai_decisions\.design: expected integer/],
+      [e => { e.payload.ai_decisions = [] }, /ai_decisions: expected object/],
+    ]
+    for (const [mutate, match] of cases) {
+      const e = full()
+      mutate(e)
+      rejects(e, match)
+    }
+    const edge = full()
+    edge.payload.invocations[0].cost = { tokens: 1e10, usd: 1e4 }
+    expect(() => validateInput(edge)).not.toThrow()
+    edge.payload.invocations[0].cost = { tokens: 0, usd: 0.000001 }
+    expect(() => validateInput(edge)).not.toThrow()
+  })
+
+  it('Q6: unknown dimension, ai_decisions key, change_kind or position exits 2 and lists the allowed values', () => {
+    rejects(decisionEvent({ payload: { ...decisionEvent().payload, dimension: 'budget' } }), new RegExp(`dimension: expected one of ${DIMENSIONS.join('\\|')}`))
+    const rand = mulberry32(13)
+    const word = () => Array.from({ length: 1 + Math.floor(rand() * 10) }, () => 'abcdefghijklmnopqrstuvwxyz-_'[Math.floor(rand() * 28)]).join('')
+    for (let i = 0; i < 100; i++) {
+      const w = word()
+      if (!(DIMENSIONS as readonly string[]).includes(w)) {
+        rejects(decisionEvent({ payload: { ...decisionEvent().payload, dimension: w } }), /dimension: expected one of/)
+        const s = stageEvent()
+        s.payload.ai_decisions = { [w]: 1 }
+        rejects(s, /ai_decisions\..*: expected one of/)
+      }
+      if (!(CHANGE_KINDS as readonly string[]).includes(w)) {
+        rejects(stageEvent({ payload: { ...stageEvent().payload, change_kind: w } }), /change_kind: expected one of/)
+        rejects(probeEvent({ payload: { ...probeEvent().payload, change_kind: w } }), /change_kind: expected one of/)
+      }
+      if (w !== 'run-hash-v1') rejects(decisionEvent({ payload: { ...decisionEvent().payload, position: w } }), /position: expected one of run-hash-v1/)
+    }
+    for (const bad of [1, true, ['design'], {}]) rejects(decisionEvent({ payload: { ...decisionEvent().payload, dimension: bad } }), /dimension: expected one of/)
+  })
+
+  it('checks the probe writer shape', () => {
+    const e = probeEvent()
+    e.payload.writer = { backend: 'codex', role: 'builder' }
+    rejects(e, /writer\.model: missing field/)
+    e.payload.writer = { backend: 'Codex', role: 'builder', model: null }
+    rejects(e, /writer\.backend: expected lowercase slug/)
+    e.payload.writer = { backend: 'codex', role: 'builder', model: 'm'.repeat(65) }
+    rejects(e, /writer\.model: longer than 64/)
+    e.payload.writer = { backend: 'codex', role: 'builder', model: 'gpt-5' }
+    expect(() => validateInput(e)).not.toThrow()
+  })
+
+  it('rejects a caller-supplied context', () => {
+    rejects({ ...stageEvent(), context: { v: 1 } }, /event\.context: assigned by the CLI/)
+    rejects({ ...stageEvent(), context: null }, /event\.context: assigned by the CLI/)
+  })
+
+  it('isStoredEvent accepts the new fields and a stored context with the shape-only check', () => {
+    const envelope = { event_id: 'e1', seq: 1, recorded_at: '2026-10-29T00:00:00.000Z', project_id: 'p_0000000000000000', producer: 't', harness: { version: 't', digest: 'd', install: 'i', files: {}, params: 'p' } }
+    const e = { ...full(), ...envelope, context: { v: 1, digest: '0123456789abcdef' } }
+    expect(isStoredEvent(e)).toBe(true)
+    e.payload.invocations[0].practices = Array.from({ length: 11 }, (_, i) => `p${i}`)
+    expect(isStoredEvent(e)).toBe(true)
+    expect(isStoredEvent({ ...e, context: 'x' })).toBe(false)
+    expect(isStoredEvent({ ...e, payload: { ...e.payload, change_kind: 'budget' } })).toBe(false)
+    expect(isStoredEvent({ ...decisionEvent({ payload: { ...decisionEvent().payload, dimension: 'design', position: 'run-hash-v1' } }), ...envelope })).toBe(true)
+  })
+
+  it('Q1: every pre-change event still validates and folds to the same totals', () => {
+    const rand = mulberry32(21)
+    const events = []
+    for (let i = 0; i < 200; i++) {
+      const pick = Math.floor(rand() * 4)
+      const s = stage(Math.floor(rand() * 96), [inv(['codex', 'gemini'][i % 2], Math.floor(rand() * 4), Math.floor(rand() * 3), rand() < 0.1 ? 'failed' : 'succeeded', rand() < 0.5 ? ['tdd-skill'] : [])])
+      if (pick === 0) events.push(s)
+      else if (pick === 1) events.push(s, outcome(s, rand() < 0.5 ? 'verify' : 'review', rand() < 0.7 ? 'passed' : 'failed', Math.floor(rand() * 2)))
+      else if (pick === 2) events.push(decision(['a', 'b', 'c'], rand() < 0.8 ? 'a' : null, null, ['a', 'b', 'c'][Math.floor(rand() * 3)], rand() < 0.2))
+      else events.push(probe({ verify: 'passed', c: 0, w: Math.floor(rand() * 3) }, { verify: 'passed', c: Math.floor(rand() * 2), w: 1 }))
+    }
+    for (const e of events) {
+      expect(isStoredEvent(shuffleKeys(e, rand))).toBe(true)
+      const { event_id, seq, recorded_at, project_id, producer, harness, ...input } = e
+      const { target_event_id, ...payload } = input.payload
+      expect(() => validateInput(structuredClone({ ...input, payload }))).not.toThrow()
+    }
+    const before = JSON.stringify(summarize(events))
+    const withNulls = events.map((e) => {
+      const c = structuredClone(e)
+      if (c.kind === 'stage_completed') {
+        Object.assign(c.payload, { ai_decisions: null, change_kind: null })
+        for (const i of c.payload.invocations) Object.assign(i, { model: null, mcp_tools: null, practices: null, cost: null })
+      }
+      if (c.kind === 'human_decision') Object.assign(c.payload, { dimension: null, position: null })
+      if (c.kind === 'probe') Object.assign(c.payload, { writer: null, change_kind: null })
+      return { ...c, context: { v: 1 } }
+    })
+    expect(withNulls.every(isStoredEvent)).toBe(true)
+    expect(JSON.stringify(summarize(withNulls))).toBe(before)
   })
 })

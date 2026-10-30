@@ -1,9 +1,10 @@
+import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync, truncateSync, writeFileSync } from 'node:fs'
 import { join } from 'pathe'
 import { describe, expect, it } from 'vitest'
 import { projectLog } from '../paths'
 import { resolveProject } from '../project'
-import { appendEvent, readLog, withLock } from '../store'
+import { appendEvent, readLog, recommendedIndex, withLock } from '../store'
 import { decisionEvent, mulberry32, probeEvent, shuffleKeys, stageEvent, tmp } from './fixtures'
 
 function setup() {
@@ -218,5 +219,154 @@ describe('appendEvent', () => {
     rmSync(join(log, '..', 'meta.json'))
     expect(appendEvent(stageEvent(), opts)).toMatchObject({ receipt: { status: 'duplicate' } })
     expect(existsSync(join(log, '..', 'meta.json'))).toBe(true)
+  })
+})
+
+describe('ledger dimensions: append normalization and position', () => {
+  const NEW_STAGE = ['ai_decisions', 'change_kind']
+  const NEW_INVOCATION = ['model', 'mcp_tools', 'practices', 'cost']
+
+  it('Q2: new fields given as null or left out store the same bytes and the same event_id', () => {
+    const rand = mulberry32(42)
+    for (let round = 0; round < 15; round++) {
+      const { opts, log } = setup()
+      const nulled = stageEvent()
+      for (const k of NEW_STAGE) if (rand() < 0.5) nulled.payload[k] = null
+      for (const k of NEW_INVOCATION) if (rand() < 0.5) nulled.payload.invocations[0][k] = null
+      const first = appendEvent(shuffleKeys(nulled, rand), opts) as any
+      const bytes = readFileSync(log)
+      expect(appendEvent(shuffleKeys(stageEvent(), rand), opts)).toEqual({ code: 0, receipt: { status: 'duplicate', event_id: first.receipt.event_id } })
+      expect(readFileSync(log).equals(bytes)).toBe(true)
+      const stored = readLog(log).events[0]
+      for (const k of NEW_STAGE) expect(k in stored.payload).toBe(false)
+      for (const k of NEW_INVOCATION) expect(k in stored.payload.invocations[0]).toBe(false)
+    }
+  })
+
+  it('Q2: the reverse order, absent first then null, is also a duplicate, for decisions and probes too', () => {
+    const { opts, log } = setup()
+    appendEvent(stageEvent({ payload: { ...stageEvent().payload, change_kind: 'fix' } }), opts)
+    appendEvent(decisionEvent(), opts)
+    appendEvent(probeEvent(), opts)
+    const bytes = readFileSync(log)
+    expect(appendEvent(stageEvent({ payload: { ...stageEvent().payload, change_kind: 'fix', ai_decisions: null } }), opts)).toMatchObject({ receipt: { status: 'duplicate' } })
+    expect(appendEvent(decisionEvent({ payload: { ...decisionEvent().payload, dimension: null, position: null } }), opts)).toMatchObject({ receipt: { status: 'duplicate' } })
+    expect(appendEvent(probeEvent({ payload: { ...probeEvent().payload, writer: null, change_kind: null } }), opts)).toMatchObject({ receipt: { status: 'duplicate' } })
+    expect(readFileSync(log).equals(bytes)).toBe(true)
+    expect(appendEvent(decisionEvent({ payload: { ...decisionEvent().payload, dimension: 'design' } }), opts).code).toBe(5)
+  })
+
+  it('keeps a null cost member and drops a cost whose members are both null', () => {
+    const { opts, log } = setup()
+    const half = stageEvent()
+    half.payload.invocations[0].cost = { tokens: 500, usd: null }
+    appendEvent(half, opts)
+    expect(readLog(log).events[0].payload.invocations[0].cost).toEqual({ tokens: 500, usd: null })
+    const empty = stageEvent({ operation_key: 'empty' })
+    empty.payload.invocations[0].cost = { tokens: null, usd: null }
+    appendEvent(empty, opts)
+    expect('cost' in readLog(log).events[1].payload.invocations[0]).toBe(false)
+    expect(appendEvent(stageEvent({ operation_key: 'empty' }), opts)).toMatchObject({ receipt: { status: 'duplicate' } })
+  })
+
+  it('stores mcp tool names normalized, so both spellings are the same event', () => {
+    const { opts, log } = setup()
+    const e = stageEvent()
+    e.payload.invocations[0].mcp_tools = ['mcp__context7__query-docs']
+    appendEvent(e, opts)
+    expect(readLog(log).events[0].payload.invocations[0].mcp_tools).toEqual(['context7:query-docs'])
+    const again = stageEvent()
+    again.payload.invocations[0].mcp_tools = ['context7:query-docs']
+    expect(appendEvent(again, opts)).toMatchObject({ receipt: { status: 'duplicate' } })
+  })
+
+  it('excludes a stored context from the duplicate comparison, and rejects a supplied one', () => {
+    const { opts, log } = setup()
+    appendEvent(stageEvent(), opts)
+    const stored = JSON.parse(readFileSync(log, 'utf8'))
+    writeFileSync(log, `${JSON.stringify({ ...stored, context: { v: 1, digest: '0123456789abcdef' } })}\n`)
+    expect(appendEvent(stageEvent(), opts)).toMatchObject({ receipt: { status: 'duplicate' } })
+    expect(appendEvent({ ...stageEvent(), operation_key: 'x', context: { v: 1 } }, opts)).toMatchObject({ code: 2, error: expect.stringContaining('assigned by the CLI') })
+  })
+
+  it('Q6: invalid enums and caps exit 2 and write nothing', () => {
+    const { opts, log } = setup()
+    appendEvent(stageEvent(), opts)
+    const bytes = readFileSync(log)
+    const r = appendEvent(decisionEvent({ payload: { ...decisionEvent().payload, dimension: 'budget' } }), opts) as any
+    expect(r.code).toBe(2)
+    expect(r.error).toContain('scope|design|backend|skill|permissions|acceptance|adoption')
+    expect(appendEvent(stageEvent({ operation_key: 'a', payload: { ...stageEvent().payload, ai_decisions: { budget: 1 } } }), opts).code).toBe(2)
+    expect(appendEvent(probeEvent({ payload: { ...probeEvent().payload, change_kind: 'perf' } }), opts).code).toBe(2)
+    expect(appendEvent(decisionEvent({ payload: { ...decisionEvent().payload, position: 'first' } }), opts).code).toBe(2)
+    expect(readFileSync(log).equals(bytes)).toBe(true)
+  })
+
+  it('Q13: a run-hash-v1 decision is accepted iff the recommendation sits at recommendedIndex', () => {
+    const { opts, log } = setup()
+    const rand = mulberry32(99)
+    const all = ['a', 'b', 'c', 'd', 'e', 'f']
+    for (let i = 0; i < 60; i++) {
+      const k = 2 + (i % 5)
+      const options = all.slice(0, k)
+      const runId = `run-${Math.floor(rand() * 1e9).toString(36)}`
+      const want = recommendedIndex(runId, `q${i}`, k)
+      const at = Math.floor(rand() * k)
+      const e = decisionEvent({ run_id: runId, operation_key: `q${i}` })
+      Object.assign(e.payload, { decision_id: `q${i}`, options, recommendation: options[at], final_choice: options[0], final_position: 0, position: 'run-hash-v1' })
+      const r = appendEvent(e, opts) as any
+      if (at === want) expect(r.code).toBe(0)
+      else expect(r).toMatchObject({ code: 2, error: expect.stringContaining(`index ${want}`) })
+      delete e.payload.position
+      if (at !== want) expect(appendEvent(e, opts).code).toBe(0)
+    }
+    expect(readLog(log).events.filter(e => e.payload.position === 'run-hash-v1').length).toBeGreaterThan(0)
+  }, 60_000)
+
+  it('Q13: run-hash-v1 requires a recommendation and blind false, and matches the formula', () => {
+    const { opts } = setup()
+    const runId = 'run-1'
+    expect(recommendedIndex(runId, 'q1', 3)).toBe(Number.parseInt(createHash('sha256').update('run-1\0q1').digest('hex').slice(0, 8), 16) % 3)
+    const options = ['x', 'y', 'z']
+    const rec = options[recommendedIndex(runId, 'q1', 3)]
+    const base = { ...decisionEvent().payload, options, recommendation: rec, final_choice: rec, final_position: options.indexOf(rec), position: 'run-hash-v1' }
+    expect(appendEvent(decisionEvent({ payload: { ...base, recommendation: null } }), opts)).toMatchObject({ code: 2, error: expect.stringContaining('requires a recommendation') })
+    expect(appendEvent(decisionEvent({ payload: { ...base, blind: true } }), opts)).toMatchObject({ code: 2, error: expect.stringContaining('blind false') })
+    expect(appendEvent(decisionEvent({ payload: base }), opts).code).toBe(0)
+  })
+
+  it('Q13: recommendedIndex is uniform over k = 2..6', () => {
+    for (let k = 2; k <= 6; k++) {
+      const counts = Array.from({ length: k }, () => 0)
+      const n = 3000
+      for (let i = 0; i < n; i++) counts[recommendedIndex(`run-${i}`, 'd', k)]++
+      const chi2 = counts.reduce((s, c) => s + (c - n / k) ** 2 / (n / k), 0)
+      // Critical values of chi-square at p = 0.001 for k - 1 degrees of freedom.
+      expect(chi2).toBeLessThan([10.83, 13.82, 16.27, 18.47, 20.52][k - 2])
+    }
+  })
+
+  it('accepts a partial cost, stores it in one canonical form, and treats ai_decisions {} as absent', () => {
+    const { opts, log } = setup()
+    const withCost = (cost: any, extra: Record<string, unknown> = {}) => {
+      const e = stageEvent({ operation_key: 'c' })
+      e.payload.invocations[0].cost = cost
+      Object.assign(e.payload, extra)
+      return e
+    }
+    expect(appendEvent(withCost({ tokens: 1200 }), opts)).toMatchObject({ receipt: { status: 'appended' } })
+    expect(appendEvent(withCost({ tokens: 1200, usd: null }), opts)).toMatchObject({ receipt: { status: 'duplicate' } })
+    expect(readLog(log).events.at(-1)!.payload.invocations[0].cost).toEqual({ tokens: 1200, usd: null })
+    expect(appendEvent(withCost({}), opts).code).toBe(2)
+    const a = stageEvent({ operation_key: 'ai' })
+    expect(appendEvent({ ...a, payload: { ...a.payload, ai_decisions: {} } }, opts)).toMatchObject({ receipt: { status: 'appended' } })
+    expect(appendEvent(a, opts)).toMatchObject({ receipt: { status: 'duplicate' } })
+  })
+
+  it('never mutates the caller\'s event object', () => {
+    const { opts } = setup()
+    const e = decisionEvent({ operation_key: 'mut', payload: { ...decisionEvent().payload, dimension: null } })
+    appendEvent(e, opts)
+    expect('dimension' in e.payload).toBe(true)
   })
 })
