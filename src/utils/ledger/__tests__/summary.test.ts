@@ -34,6 +34,15 @@ describe('contribution verdicts', () => {
   })
 })
 
+describe('review fixes: orchestrator', () => {
+  it('is not a reviewer: its accepted findings count for no backend, role or skill', () => {
+    const s = summarize(Array.from({ length: 6 }, () => stage(70, [inv('claude', 5, 0, 'succeeded', ['s'], 'orchestrator'), inv('codex', 1, 0)])))
+    expect(s.participants.backend.map(g => g.name)).toEqual(['codex'])
+    expect(s.participants.role.map(g => g.name)).toEqual(['reviewer'])
+    expect(s.participants.skill).toEqual([])
+  })
+})
+
 describe('calibration', () => {
   it('pairs only with later outcomes, never with the stage\'s own verify', () => {
     const a = stage(85)
@@ -77,8 +86,23 @@ describe('P7: influence classes', () => {
     // The recommended option is listed second here, so the first-position rule does not fire either.
     const mixed = [...Array.from({ length: 9 }, () => decision(['b', 'a'], 'a', null, 'a')), decision(['b', 'a'], 'a', null, 'b')]
     expect(summarize(mixed).influence.rubber_stamp.flag).toBe(false)
-    const firsts = Array.from({ length: 10 }, (_, i) => decision(['a', 'b'], null, null, i < 9 ? 'a' : 'b'))
-    expect(summarize(firsts).influence.rubber_stamp).toEqual({ flag: true, basis: 'first option chosen 9/10' })
+    const marked = { position: 'run-hash-v1' }
+    const firsts = Array.from({ length: 10 }, (_, i) => decision(['a', 'b'], 'b', null, i < 9 ? 'a' : 'b'))
+    for (const d of firsts) Object.assign(d.payload, marked)
+    expect(summarize(firsts).influence.rubber_stamp).toEqual({ flag: true, basis: 'first option chosen 9/10 randomized decisions' })
+  })
+
+  it('counts first position over randomized decisions only and reports the excluded ones', () => {
+    const pre = Array.from({ length: 12 }, () => decision(['a', 'b'], 'b', null, 'a'))
+    const post = Array.from({ length: 3 }, () => decision(['a', 'b'], 'b', null, 'a'))
+    for (const d of post) d.payload.position = 'run-hash-v1'
+    const s = summarize([...pre, ...post])
+    expect(s.influence.first_position).toEqual({ n: 3, rate: 1, excluded_pre_fix: 12 })
+    const blindOnly = summarize([decision(['x', 'y'], null, null, 'x', true), decision(['a', 'b'], null, null, 'a')])
+    expect(blindOnly.influence.first_position.excluded_pre_fix).toBe(0)
+    expect(s.influence.recommended_choice_rate).toBe(0)
+    expect(s.influence.rubber_stamp.flag).toBe(false)
+    expect(summaryLines('t', summarize(pre), 0).join('\n')).toContain('first-position: n/a (12 not randomized)')
   })
 })
 

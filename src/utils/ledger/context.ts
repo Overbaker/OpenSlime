@@ -15,7 +15,7 @@ export interface ObservedContext {
   digest: string
 }
 
-const MAX_NAMES = 100
+export const MAX_NAMES = 100
 const MAX_RULE_FILES = 500
 const MAX_RULE_DEPTH = 4
 const MAX_CLAUDE_JSON = 5 * 1024 * 1024
@@ -112,17 +112,29 @@ function serverKeys(obj: any): string[] | null {
   return obj && typeof obj === 'object' && !Array.isArray(obj) ? Object.keys(obj) : null
 }
 
-function mcpServers(root: string, home: string | null): ObservedContext['mcp_servers'] {
+function mcpServers(root: string, start: string, home: string | null): ObservedContext['mcp_servers'] {
   let user: string[] | null = null
   let local: string[] | null = null
   attempt(() => {
     if (!home) return
     const claudeJson = join(home, '.claude.json')
+    // No ~/.claude.json means no user or local servers, which is known; an unreadable one stays null.
+    if (!existsSync(claudeJson)) {
+      user = []
+      local = []
+      return
+    }
     if (statSync(claudeJson).size > MAX_CLAUDE_JSON) return
     // Only keys are kept: server commands, args, env and urls are dropped with the parsed object.
     const parsed = readJson(claudeJson)
     user = serverKeys(parsed?.mcpServers) ?? []
-    local = serverKeys(parsed?.projects?.[root]?.mcpServers) ?? []
+    // Claude Code keys local servers by the launch directory, which may sit below the git root.
+    let entry
+    for (let dir = resolve(start); entry === undefined; dir = dirname(dir)) {
+      entry = parsed?.projects?.[dir]
+      if (dir === root || dirname(dir) === dir) break
+    }
+    local = entry === undefined ? null : serverKeys(entry?.mcpServers) ?? []
   }, undefined)
   const project = attempt(() => (existsSync(join(root, '.mcp.json')) ? serverKeys(readJson(join(root, '.mcp.json')).mcpServers) ?? [] : []), null)
   const all = [user, local, project] as Array<string[] | null>
@@ -150,7 +162,7 @@ export function computeContext(opts: { installDir: string, projectRoot: string, 
     },
     rules: { user: rulesHash(join(opts.installDir, 'rules')), project: rulesHash(join(root, '.claude', 'rules')) },
     skills: { user: names(userSkills), project: names(projectSkills), total: new Set([...userSkills, ...projectSkills]).size },
-    mcp_servers: mcpServers(root, home),
+    mcp_servers: mcpServers(root, opts.projectRoot, home),
   }
   return { ...body, digest: sha256Hex(canonicalJson(body), 16) }
 }

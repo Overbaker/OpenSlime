@@ -1,11 +1,15 @@
-import { readFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { mkdirSync, mkdtempSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import fs from 'fs-extra'
 import { join } from 'pathe'
 import { describe, expect, it } from 'vitest'
 import { getAllCommandIds, installWorkflows } from '../installer'
 import { PACKAGE_ROOT } from '../installer-template'
+import { PRACTICES } from '../ledger/dimensions'
 import { PARAMS } from '../ledger/params'
+import { CHANGE_KINDS, DIMENSIONS } from '../ledger/schema'
+import { recommendedIndex } from '../ledger/store'
 
 const read = (rel: string) => readFileSync(join(PACKAGE_ROOT, 'templates', rel), 'utf8')
 const ledger = read('prompts/claude/osm-ledger.md')
@@ -46,4 +50,37 @@ describe('installed ledger prompts', () => {
     expect(installed).toContain(`${installDir}/bin/osm ledger lessons query`)
     expect(readFileSync(join(installDir, 'commands', 'osm', 'impl.md'), 'utf8')).toContain(`${installDir}/.ccg/prompts/claude/osm-ledger.md`)
   }, 60_000)
+})
+
+describe('Q18: report template budget and vocabularies', () => {
+  const report = read('prompts/claude/osm-report.md')
+
+  it('stays within 5,200 bytes and lists the schema enums exactly', () => {
+    expect(Buffer.byteLength(report)).toBeLessThanOrEqual(5200)
+    const dims = report.match(/`dimension` is one of (.*?) \(lesson adoption: `adoption`\)/)![1]
+    expect([...dims.matchAll(/`([a-z]+)`/g)].map(m => m[1]).concat('adoption').sort()).toEqual([...DIMENSIONS].sort())
+    expect(report.match(/`practices` from `([^`]+)`/)![1].split(', ')).toEqual([...PRACTICES])
+    for (const t of [report, ledger]) expect(t.match(/`(feature \| fix[^`]*)`/)![1].split(' | ')).toEqual([...CHANGE_KINDS])
+  })
+
+  it('every JSON example appends with exit 0 through the CLI', () => {
+    const run = '0f0e0d0c-0b0a-4908-8706-050403020100'
+    let slug = 'q0'
+    for (let i = 0; recommendedIndex(run, slug, 2) !== 1; i++) slug = `q${i}`
+    const fill = (j: string) => j.replaceAll('<run id>', run).replaceAll('<change id or null>', 'c1').replaceAll('<change id>', 'c1').replaceAll('<change>', 'c1')
+      .replaceAll('<question slug>', slug).replaceAll('<≤200 chars>', 'topic').replaceAll('<phase>', '1').replaceAll('<sha>', 'abc').replaceAll('<task>', 't1').replaceAll('<lesson>', 'L-0007')
+    const examples = [report, ledger].flatMap(t => [...t.matchAll(/append <<'JSON'\n([\s\S]*?)\nJSON/g)].map(m => fill(m[1])))
+    expect(examples.length).toBeGreaterThanOrEqual(4)
+    const home = mkdtempSync(join(tmpdir(), 'osm-tpl-home-'))
+    mkdirSync(join(home, 'p', 'openspec'), { recursive: true })
+    const tsx = join(PACKAGE_ROOT, 'node_modules', 'tsx', 'dist', 'loader.mjs')
+    // The outcome example targets an impl phase of the change; give it one.
+    const seed = JSON.stringify({ schema_version: 1, run_id: run, change_id: 'c1', stage: 'impl', phase_id: '1', kind: 'stage_completed', operation_key: 'report-1', payload: { status: 'completed', confidence: { percent: 70 }, verify: 'passed', invocations: [] } })
+    for (const json of [seed, ...examples]) {
+      expect(json, json).not.toMatch(/<[^>]+>/)
+      const r = spawnSync(process.execPath, ['--import', `file://${tsx}`, join(PACKAGE_ROOT, 'src', 'cli.ts'), 'ledger', 'append'], { cwd: join(home, 'p'), input: json, env: { ...process.env, HOME: home, OSM_LEDGER: '' }, encoding: 'utf8' })
+      expect(r.status, `${json}\n${r.stderr}`).toBe(0)
+      expect(JSON.parse(r.stdout).status).toBe('appended')
+    }
+  }, 120_000)
 })

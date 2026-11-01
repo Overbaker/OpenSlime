@@ -622,13 +622,86 @@ export function queryLine(r: QueryRow): string {
   return r.conflict ? cut(`${base} · conflict`, PARAMS.lessons.indexLineMax) : base
 }
 
-export function showLesson(l: Lesson, state: LessonState, t: Tally): string[] {
+const CARD_AXES = ['backend', 'model', 'role', 'change kind'] as const
+type CardAxis = typeof CARD_AXES[number]
+const BUILTIN_BACKENDS = ['codex', 'antigravity', 'claude']
+const CARD_NAMES = 5
+
+export interface LessonCard {
+  evidence: Record<CardAxis, Map<string, number>>
+  untested: Record<CardAxis, string[]>
+  not_credited: { inert: number, void: number, confounded: number }
+}
+
+/**
+ * Where a lesson's credited probes ran, and which values this project uses that no credited probe covered
+ * (after Hermit's adapter CARD.md). Probes without the fields count as `unknown`; unknown is never "untested".
+ */
+export function lessonCard(events: LedgerEvent[], scope: string, lessonId: string): LessonCard {
+  const empty = () => Object.fromEntries(CARD_AXES.map(a => [a, new Map<string, number>()])) as Record<CardAxis, Map<string, number>>
+  const evidence = empty()
+  const not_credited = { inert: 0, void: 0, confounded: 0 }
+  const kindOfChange = new Map<string, string>()
+  const used: Record<CardAxis, Set<string>> = { 'backend': new Set(BUILTIN_BACKENDS), 'model': new Set(), 'role': new Set(), 'change kind': new Set() }
+  for (const e of events) {
+    if (e.kind !== 'stage_completed') continue
+    const kind = e.payload.change_kind
+    if (typeof kind === 'string') {
+      used['change kind'].add(kind)
+      if (e.change_id && !kindOfChange.has(e.change_id)) kindOfChange.set(e.change_id, kind)
+    }
+    for (const inv of (e.payload.invocations ?? []) as Record<string, any>[]) {
+      if (inv.role === 'orchestrator') continue
+      if (typeof inv.backend === 'string') used.backend.add(inv.backend)
+      if (typeof inv.role === 'string') used.role.add(inv.role)
+      if (typeof inv.model === 'string') used.model.add(inv.model)
+    }
+  }
+  for (const e of events) {
+    if (e.kind !== 'probe' || e.payload.mode !== 'lesson' || e.payload.lesson_id !== lessonId || e.payload.lesson_scope !== scope) continue
+    const r = probeResult(e.payload as any)
+    if (r === 'inert' || r === 'void' || r === 'confounded') not_credited[r]++
+    if (!isCredited(r)) continue
+    const w = e.payload.writer ?? {}
+    const values: Record<CardAxis, unknown> = {
+      'backend': w.backend,
+      'model': w.model,
+      'role': w.role,
+      'change kind': e.payload.change_kind ?? (e.change_id ? kindOfChange.get(e.change_id) : undefined),
+    }
+    for (const a of CARD_AXES) {
+      // Parenthesized so it never collides with a recorded slug that is literally `unknown`.
+      const v = typeof values[a] === 'string' ? values[a] as string : '(unknown)'
+      evidence[a].set(v, (evidence[a].get(v) ?? 0) + 1)
+    }
+  }
+  const untested = Object.fromEntries(CARD_AXES.map(a => [a, [...used[a]].filter(v => !evidence[a].has(v)).sort()])) as Record<CardAxis, string[]>
+  return { evidence, untested, not_credited }
+}
+
+function capNames(names: string[]): string {
+  return names.length > CARD_NAMES ? `${names.slice(0, CARD_NAMES).join(', ')} +${names.length - CARD_NAMES} more` : names.join(', ')
+}
+
+export function cardLines(c: LessonCard): string[] {
+  const ev = CARD_AXES.filter(a => c.evidence[a].size).map(a => `${a} ${capNames([...c.evidence[a].entries()].sort(([x], [y]) => (x < y ? -1 : x > y ? 1 : 0)).map(([v, n]) => `${v} ×${n}`))}`)
+  const un = CARD_AXES.filter(a => c.untested[a].length).map(a => `${a} ${capNames(c.untested[a])}`)
+  const nc = c.not_credited
+  return [
+    `evidence from: ${ev.length ? ev.join(' · ') : 'no credited probes'}`,
+    `untested on: ${un.length ? un.join(' · ') : 'nothing known'}`,
+    ...(nc.inert + nc.void + nc.confounded ? [`also seen (not credited): inert ${nc.inert} · void ${nc.void} · confounded ${nc.confounded}`] : []),
+  ]
+}
+
+export function showLesson(l: Lesson, state: LessonState, t: Tally, card: string[] = []): string[] {
   const lines = [
     `${l.id} · ${l.scope} · ${state} · slot ${l.slot} · revision ${l.revision}`,
     `line: ${l.line}`,
     `cue: ${l.cue}`,
     `match: globs ${JSON.stringify(l.match.globs)} · kind ${l.match.kind} · keywords ${JSON.stringify(l.match.keywords)}`,
     `tally: W${t.W} L${t.L} T${t.T} · inert ${t.inert} · void ${t.void} · decisive ${t.decisive}/${t.total} · wins from ${t.changes_with_wins} changes · severe ${t.severe_losses}`,
+    ...card,
     `evidence: ${l.evidence.join(', ')}${l.contradicts.length ? ` · contradicts: ${l.contradicts.join(', ')}` : ''}`,
     `from: ${l.created_from}${l.promoted_from ? ` · promoted from ${l.promoted_from}` : ''}`,
   ]

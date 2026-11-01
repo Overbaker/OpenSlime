@@ -1,10 +1,10 @@
 import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { appendFileSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { dirname, join } from 'pathe'
 import { describe, expect, it } from 'vitest'
-import { decisionEvent, tmp } from './fixtures'
+import { decisionEvent, stageEvent, tmp } from './fixtures'
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..')
 // Spawned from a temp cwd, so `--import tsx` cannot resolve the package by name.
@@ -12,9 +12,9 @@ const tsx = pathToFileURL(join(repo, 'node_modules', 'tsx', 'dist', 'loader.mjs'
 const cliEntry = join(repo, 'src', 'cli.ts')
 
 /** Async, so a test that runs many CLI calls never blocks the vitest worker (its RPC times out on slow CI). */
-async function osm(args: string[], input: string | null, env: Record<string, string> = {}): Promise<{ code: number | null, stdout: string, stderr: string, home: string }> {
+async function osm(args: string[], input: string | null, env: Record<string, string> = {}, projectName = 'proj'): Promise<{ code: number | null, stdout: string, stderr: string, home: string }> {
   const home = env.HOME ?? tmp('osm-home-')
-  const project = join(home, 'proj')
+  const project = join(home, projectName)
   mkdirSync(join(project, 'openspec'), { recursive: true })
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, ['--import', tsx, cliEntry, 'ledger', ...args], {
@@ -90,6 +90,31 @@ describe('osm ledger summary and harness', () => {
     expect((await osm(['summary', '--project', 'nope'], null, { HOME: home })).code).toBe(2)
     expect((await osm(['summary', '--all-projects'], null, { HOME: home })).stdout).toContain('all projects (1)')
   }, 60_000)
+
+  it('groups by dimension and by decision dimension, and rejects bad --by, --window and --runs', async () => {
+    const home = await seeded()
+    const skill = await osm(['summary', '--by', 'skill'], null, { HOME: home })
+    expect(skill.code).toBe(0)
+    expect(skill.stdout).toContain('by skill (recorded) · associations, not causes · Holm m=0')
+    const dec = JSON.parse((await osm(['summary', '--by', 'decision', '--json'], null, { HOME: home })).stdout)
+    expect(dec.rows.find((r: any) => r.dimension === 'unknown')).toMatchObject({ n: 4, adopted: 1, overrode: 3 })
+    const win = JSON.parse((await osm(['summary', '--by', 'window', '--window', '7', '--runs', '2', '--json'], null, { HOME: home })).stdout)
+    expect(win).toMatchObject({ by: 'window', source: 'recorded', totals: { items: 0 } })
+    const aliasHome = tmp('osm-home-')
+    const skills = Array.from({ length: 25 }, (_, i) => `k${String(i).padStart(2, '0')}`)
+    const st = stageEvent()
+    st.payload.invocations = [{ ...st.payload.invocations[0], skills, accepted: 1, rejected: 0 }]
+    await osm(['append'], JSON.stringify(st), { HOME: aliasHome })
+    const alias = JSON.parse((await osm(['summary', '--by', 'skill', '--json'], null, { HOME: aliasHome })).stdout)
+    expect(alias.items[0].rows[0]).toMatchObject({ aliased_omitted: 4 })
+    expect(alias.items[0].rows[0].aliased_with).toHaveLength(20)
+    expect((await osm(['summary', '--by', 'budget'], null, { HOME: home })).code).toBe(2)
+    expect((await osm(['summary', '--by', 'skill', '--window', '14'], null, { HOME: home })).code).toBe(2)
+    expect((await osm(['summary', '--by', 'skill', '--runs', '0'], null, { HOME: home })).code).toBe(2)
+    expect((await osm(['summary', '--by', 'skill', '--by-harness'], null, { HOME: home })).code).toBe(2)
+    expect((await osm(['summary', '--runs', '3'], null, { HOME: home })).code).toBe(2)
+    expect((await osm(['summary', '--by', 'decision', '--window', '7'], null, { HOME: home })).code).toBe(2)
+  }, 90_000)
 })
 
 describe('summary over imperfect logs', () => {
@@ -189,6 +214,7 @@ describe('lessons end to end', () => {
     const probe = (n: number, change: string) => ({
       schema_version: 1, run_id: `r${n}`, change_id: change, stage: 'impl', phase_id: '1', kind: 'probe', operation_key: `p${n}`,
       payload: { lesson_id: 'L-0001', lesson_scope: 'project', mode: 'lesson', skip_reason: null, forced: false, interdiff_lines: 3, ab_map_recorded_after_reviews: true, landed: 'A',
+        writer: { backend: 'codex', role: 'builder', model: null },
         candidates: [
           { label: 'A', has_lesson: true, fingerprint: 'f', verify: 'passed', critical_confirmed: 0, warning_confirmed: 0, diff_lines: 4 },
           { label: 'B', has_lesson: false, fingerprint: 'f', verify: 'passed', critical_confirmed: 1, warning_confirmed: 0, diff_lines: 4 },
@@ -207,7 +233,13 @@ describe('lessons end to end', () => {
     const q = (await osm(['lessons', 'query', '--files', 'src/import/rows.ts', '--kind', 'backend', '--text', 'bulk import'], null, { HOME: home })).stdout.trim().split('\n')
     expect(q[0]).toMatch(/^L-0001 adopted project "Validate every row ID/)
     expect(q[1]).toMatch(/^L-0002 trial project/)
-    expect((await osm(['lessons', 'show', 'L-0001'], null, { HOME: home })).stdout).toContain('tally: W4 L0 T0')
+    const st = stageEvent({ operation_key: 'uses-agy' })
+    st.payload.invocations = [{ ...st.payload.invocations[0], backend: 'antigravity' }]
+    expect((await osm(['append'], JSON.stringify(st), { HOME: home })).code).toBe(0)
+    const card = (await osm(['lessons', 'show', 'L-0001'], null, { HOME: home })).stdout
+    expect(card).toContain('tally: W4 L0 T0')
+    expect(card).toContain('evidence from: backend codex ×4 · model (unknown) ×4 · role builder ×4')
+    expect(card).toMatch(/untested on: backend antigravity, claude · role reviewer/)
     const summary = (await osm(['summary'], null, { HOME: home })).stdout
     expect(summary).toContain('Lessons project: trial 1 · adopted 1 · candidate 0 · retired 0')
     expect(summary).not.toContain('pending adoption')
@@ -238,3 +270,80 @@ describe('osm ledger position', () => {
   }, 60_000)
 })
 
+
+describe('osm ledger render', () => {
+  function manifest(dir: string): Record<string, string> {
+    const outm: Record<string, string> = {}
+    const walk = (d: string) => {
+      for (const e of readdirSync(d, { withFileTypes: true })) {
+        const p = join(d, e.name)
+        if (e.isDirectory()) walk(p)
+        else outm[p] = createHash('sha256').update(readFileSync(p)).digest('hex')
+      }
+    }
+    walk(dir)
+    return outm
+  }
+
+  it('writes both themes under renders/, keeps the tree and log untouched, and hides canaries', async () => {
+    const repo = 'zqcanaryrepo'
+    const first = await osm(['append'], JSON.stringify(decisionEvent({ change_id: 'zqcanarychange', payload: { ...decisionEvent().payload, topic: 'zqcanarytopic', decision_id: 'zqcanarydecision' } })), {}, repo)
+    expect(first.code).toBe(0)
+    const home = first.home
+    const ledgerRoot = join(home, '.claude', 'osm-ledger')
+    const before = manifest(ledgerRoot)
+    const projectBefore = manifest(join(home, repo))
+    for (const args of [['summary'], ['summary', '--by', 'skill'], ['position', '--run-id', 'r', '--decision-id', 'd', '--options', '3']]) await osm(args, null, { HOME: home }, repo)
+    expect(manifest(ledgerRoot)).toEqual(before)
+    const r = await osm(['render', '--svg'], null, { HOME: home, TZ: 'UTC' }, repo)
+    expect(r.code).toBe(0)
+    const after = manifest(ledgerRoot)
+    const added = Object.keys(after).filter(k => !(k in before))
+    expect(added.map(k => k.slice(ledgerRoot.length)).sort()).toEqual([expect.stringMatching(/^\/renders\/p_[0-9a-f]{16}-dark\.svg$/), expect.stringMatching(/^\/renders\/p_[0-9a-f]{16}-light\.svg$/)])
+    for (const k of Object.keys(before)) expect(after[k]).toBe(before[k])
+    expect(manifest(join(home, repo))).toEqual(projectBefore)
+    expect(r.stdout).toContain('<picture>')
+    const light = readFileSync(added.find(k => k.endsWith('light.svg'))!, 'utf8')
+    for (const canary of ['zqcanary', home]) expect(light).not.toContain(canary)
+    expect(light).toMatch(/n = 1 events · 1 runs · 1 changes · data: \d{4}-\d{2}-\d{2} – \d{4}-\d{2}-\d{2}/)
+    const shanghai = await osm(['render', '--svg', '--out', '-', '--theme', 'light'], null, { HOME: home, TZ: 'Asia/Shanghai', LANG: 'zh_CN.UTF-8' }, repo)
+    expect(shanghai.stdout).toBe(light)
+    expect((await osm(['render', '--svg', '--out', '-', '--theme', 'light', '--show-names'], null, { HOME: home }, repo)).stdout).toContain(repo)
+    const pid = added[0].match(/p_[0-9a-f]{16}/)![0]
+    const byId = await osm(['render', '--svg', '--out', '-', '--theme', 'dark', '--project', pid], null, { HOME: home }, repo)
+    expect(byId.code).toBe(0)
+    expect(byId.stdout).not.toContain(repo)
+    expect((await osm(['render', '--svg', '--out', '-', '--theme', 'dark', '--project', pid, '--show-names'], null, { HOME: home }, repo)).stdout).toContain(repo)
+  }, 90_000)
+
+  it('refuses to overwrite a foreign file without --force and validates options', async () => {
+    const home = (await osm(['append'], JSON.stringify(decisionEvent()))).home
+    const foreign = join(home, 'mine.svg')
+    writeFileSync(foreign, '<svg/>')
+    expect((await osm(['render', '--svg', '--out', foreign, '--theme', 'light'], null, { HOME: home })).code).toBe(2)
+    expect(readFileSync(foreign, 'utf8')).toBe('<svg/>')
+    expect((await osm(['render', '--svg', '--out', foreign, '--theme', 'light', '--force'], null, { HOME: home })).code).toBe(0)
+    expect(readFileSync(foreign, 'utf8')).toContain('<!-- osm-ledger render -->')
+    expect((await osm(['render', '--svg', '--out', foreign, '--theme', 'light'], null, { HOME: home })).code).toBe(0)
+    expect((await osm(['render'], null, { HOME: home })).code).toBe(2)
+    expect((await osm(['render', '--svg', '--out', 'x.png'], null, { HOME: home })).code).toBe(2)
+    expect((await osm(['render', '--svg', '--theme', 'sepia'], null, { HOME: home })).code).toBe(2)
+    expect((await osm(['render', '--svg', '--by', 'budget'], null, { HOME: home })).code).toBe(2)
+    expect((await osm(['render', '--svg', '--out', '-'], null, { HOME: home })).code).toBe(2)
+    expect((await osm(['render', '--svg', '--out', '--theme', 'light'], null, { HOME: home })).code).toBe(2)
+    const victim = join(home, 'victim.txt')
+    const link = join(home, 'link.svg')
+    symlinkSync(victim, link)
+    expect((await osm(['render', '--svg', '--out', link, '--theme', 'light', '--force'], null, { HOME: home })).code).toBe(2)
+    expect(existsSync(victim)).toBe(false)
+    const dirTarget = join(home, 'adir.svg')
+    mkdirSync(dirTarget)
+    expect((await osm(['render', '--svg', '--out', dirTarget, '--theme', 'dark', '--force'], null, { HOME: home })).code).toBe(2)
+    const both = join(home, 'pair.svg')
+    writeFileSync(join(home, 'pair-dark.svg'), 'mine')
+    expect((await osm(['render', '--svg', '--out', both], null, { HOME: home })).code).toBe(2)
+    expect(existsSync(join(home, 'pair-light.svg'))).toBe(false)
+    writeFileSync(foreign, `<svg>\n<desc><!-- osm-ledger render --></desc>`)
+    expect((await osm(['render', '--svg', '--out', foreign, '--theme', 'light'], null, { HOME: home })).code).toBe(2)
+  }, 90_000)
+})

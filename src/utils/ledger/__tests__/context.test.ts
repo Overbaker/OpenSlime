@@ -120,3 +120,35 @@ describe('observed context', () => {
   })
 })
 
+
+describe('review fixes: MCP scopes', () => {
+  it('treats a missing ~/.claude.json as no servers, finds local servers by launch dir, and an unknown project as null', () => {
+    const w = world()
+    expect(computeContext({ installDir: w.installDir, projectRoot: w.root, home: w.home }).mcp_servers).toEqual({ user: [], local: [], project: [], total: 0 })
+    const sub = join(w.root, 'packages', 'web')
+    mkdirSync(sub, { recursive: true })
+    put(join(w.home, '.claude.json'), JSON.stringify({ mcpServers: {}, projects: { [sub]: { mcpServers: { db: {} } } } }))
+    expect(computeContext({ installDir: w.installDir, projectRoot: sub, home: w.home }).mcp_servers.local).toEqual(['db'])
+    expect(computeContext({ installDir: w.installDir, projectRoot: w.root, home: w.home }).mcp_servers.local).toBeNull()
+  })
+
+  it('uses HOME from the append env to find ~/.claude.json', () => {
+    const w = world()
+    put(join(w.home, '.claude.json'), JSON.stringify({ mcpServers: { 'env-home-server': {} } }))
+    const r = appendEvent(stageEvent(), { root: join(w.base, 'ledger'), installDir: w.installDir, projectRoot: w.root, version: 't', env: { HOME: w.home } })
+    expect(r.code).toBe(0)
+    const line = readLog(projectLog(join(w.base, 'ledger'), resolveProject(w.root).id)).events[0] as any
+    expect(line.context.mcp_servers.user).toEqual(['env-home-server'])
+  })
+})
+
+describe('review fixes: local MCP lookup walks up', () => {
+  it('uses the nearest ancestor with a projects entry between cwd and the git root', () => {
+    const w = world()
+    const launch = join(w.root, 'pkg')
+    const cwd = join(launch, 'src')
+    mkdirSync(cwd, { recursive: true })
+    put(join(w.home, '.claude.json'), JSON.stringify({ projects: { [launch]: { mcpServers: { db: {} } }, [w.root]: { mcpServers: {} } } }))
+    expect(computeContext({ installDir: w.installDir, projectRoot: cwd, home: w.home }).mcp_servers.local).toEqual(['db'])
+  })
+})

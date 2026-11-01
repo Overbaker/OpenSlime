@@ -42,7 +42,9 @@ export type InfluenceClass = 'adopted' | 'reversed' | 'overrode' | 'unknown'
 export interface Influence {
   decisions: number
   classes: Record<InfluenceClass, number>
-  first_position: { n: number, rate: number | null }
+  /** Only decisions marked `position: run-hash-v1`; earlier ones cannot tell position bias from recommendation. */
+  first_position: { n: number, rate: number | null, excluded_pre_fix: number }
+  recommended_choice_rate: number | null
   blind: { n: number, agreed: number }
   rubber_stamp: { flag: boolean, basis: string | null }
 }
@@ -139,6 +141,8 @@ function participants(stageEvents: LedgerEvent[]): Summary['participants'] {
   const maps = { backend: new Map<string, Acc>(), skill: new Map<string, Acc>(), role: new Map<string, Acc>() }
   for (const e of stageEvents) {
     for (const inv of e.payload.invocations as Invocation[]) {
+      // Claude's own usage is recorded for cost, never as a contributor (spec: orchestrator is not a reviewer).
+      if (inv.role === 'orchestrator') continue
       const keys: Array<[keyof typeof maps, string]> = [['backend', inv.backend], ['role', inv.role], ...[...new Set(inv.skills)].map(s => ['skill', s] as [keyof typeof maps, string])]
       for (const [kind, name] of keys) {
         const a = maps[kind].get(name) ?? emptyAcc()
@@ -221,16 +225,18 @@ function influence(decisions: LedgerEvent[]): Influence {
   let first = 0
   let blind = 0
   let agreed = 0
+  const marked = decisions.filter(d => d.payload.position === 'run-hash-v1')
+  for (const d of marked) if (d.payload.final_position === 0) first++
   for (const d of decisions) {
     classes[classify(d.payload)]++
-    if (d.payload.final_position === 0) first++
     if (d.payload.blind) {
       blind++
       if (d.payload.final_choice === 'with-lesson') agreed++
     }
   }
-  const firstRate = rate(first, decisions.length)
+  const firstRate = rate(first, marked.length)
   const recommended = decisions.filter(d => d.payload.recommendation !== null)
+  const chosen = recommended.filter(d => d.payload.final_choice === d.payload.recommendation).length
   const window = recommended.slice(-PARAMS.rubberStamp.window)
   const wClasses = window.map(d => classify(d.payload))
   const wAdopted = wClasses.filter(c => c === 'adopted').length
@@ -239,13 +245,15 @@ function influence(decisions: LedgerEvent[]): Influence {
   if (window.length === PARAMS.rubberStamp.window && wAdopted / window.length >= PARAMS.rubberStamp.adoptedShare && wOverrode === 0) {
     basis = `last ${window.length} recommended decisions: ${wAdopted} adopted, 0 overrode`
   }
-  else if (decisions.length >= PARAMS.rubberStamp.minDecisions && (firstRate ?? 0) > PARAMS.rubberStamp.firstPositionRate) {
-    basis = `first option chosen ${first}/${decisions.length}`
+  else if (marked.length >= PARAMS.rubberStamp.minDecisions && (firstRate ?? 0) > PARAMS.rubberStamp.firstPositionRate) {
+    basis = `first option chosen ${first}/${marked.length} randomized decisions`
   }
   return {
     decisions: decisions.length,
     classes,
-    first_position: { n: decisions.length, rate: firstRate },
+    // Only decisions that could have been randomized (a recommendation, not blind) count as excluded.
+    first_position: { n: marked.length, rate: firstRate, excluded_pre_fix: decisions.filter(d => d.payload.recommendation !== null && !d.payload.blind && d.payload.position !== 'run-hash-v1').length },
+    recommended_choice_rate: rate(chosen, recommended.length),
     blind: { n: blind, agreed },
     rubber_stamp: { flag: basis !== null, basis },
   }

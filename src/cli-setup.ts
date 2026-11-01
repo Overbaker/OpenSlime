@@ -184,6 +184,14 @@ export async function setupCommands(cli: CAC): Promise<void> {
     .option('--project <id>', 'Summarize this project id')
     .option('--all-projects', 'Summarize every project')
     .option('--by-harness', 'Compare harness versions')
+    .option('--by <dim>', 'summary: group by skill|mcp-tool|mcp-server|practice|output-style|backend|role|model|stage|change-kind|window|decision')
+    .option('--window <days>', 'summary --by: window size, 7|30|90')
+    .option('--runs <n>', 'summary --by: only the N most recent runs')
+    .option('--svg', 'render: write SVG')
+    .option('--out [path]', 'render: output base ending in .svg, or - for stdout')
+    .option('--theme <theme>', 'render: light|dark|both')
+    .option('--force', 'render: overwrite a file not written by render')
+    .option('--show-names', 'render: include the repo name')
     .option('--params', 'Print the built-in parameter set')
     .option('--limit <n>', 'Max output lines')
     .option('--max-bytes <n>', 'Max output bytes')
@@ -208,6 +216,14 @@ export async function setupCommands(cli: CAC): Promise<void> {
         project: rawOption('project', options.project),
         allProjects: options.allProjects,
         byHarness: options.byHarness,
+        by: rawOption('by', options.by),
+        window: options.window,
+        runs: options.runs,
+        svg: options.svg,
+        out: options.out === true && rawOption('out', undefined) === undefined ? '' : rawOption('out', options.out === true ? undefined : options.out),
+        theme: rawOption('theme', options.theme),
+        force: options.force,
+        showNames: options.showNames,
         params: options.params,
         limit: options.limit,
         maxBytes: options.maxBytes,

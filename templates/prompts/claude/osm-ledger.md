@@ -60,11 +60,13 @@ JSON
 ~/.claude/bin/osm ledger append <<'JSON'
 {"schema_version":1,"run_id":"<run id>","change_id":"<change>","stage":"impl","phase_id":"<phase>","kind":"probe","operation_key":"probe-<task>",
  "payload":{"lesson_id":"L-0007","lesson_scope":"project","mode":"lesson","skip_reason":null,"forced":false,"interdiff_lines":16,"ab_map_recorded_after_reviews":true,"landed":"B",
+  "writer":{"backend":"codex","role":"builder","model":null},"change_kind":"feature",
   "candidates":[{"label":"A","has_lesson":false,"fingerprint":"<sha>","verify":"passed","critical_confirmed":1,"warning_confirmed":0,"diff_lines":45},
                 {"label":"B","has_lesson":true,"fingerprint":"<sha>","verify":"passed","critical_confirmed":0,"warning_confirmed":0,"diff_lines":61}]}}
 JSON
 ```
 
+   - `writer` is the backend, role and model (or null) that wrote both candidates; `change_kind` is one of `feature | fix | refactor | docs | test | chore`. `lessons show` lists them as `evidence from` and `untested on`.
    - `interdiff_lines` counts the lines that differ between the two candidates. Count the diffs with new files included: run `git add -A` in each tree, then `git diff --cached HEAD`. The interdiff is `diff <(git -C <main> diff --cached HEAD) <(git -C <wt> diff --cached HEAD) | grep -c '^[<>]'`.
    - The result is decided by VERIFY first, then confirmed Criticals, then confirmed Warnings. Diff size never counts.
    - On a tie, the main side lands.
@@ -101,13 +103,13 @@ When a lesson reaches the bar (see above), or `~/.claude/bin/osm ledger summary`
 1. **Blind pick.**
    - Show the most informative interdiff, at most 20 lines, as X and Y in random order.
    - The option ids are `with-lesson`, `without-lesson` and `cant-tell`. List them in shown order: the id of X's side, the id of Y's side, then `cant-tell`. Labels are X, Y and "can't tell".
-   - `decision_id` is `blind-<id>` with `blind: true`. Give no recommendation.
+   - `decision_id` is `blind-<id>` with `blind: true` and `dimension: "adoption"`. Give no recommendation.
 2. **Reveal.**
    - Say which side had the lesson.
    - Show the tally with losses and inert results first, then the brief diff `+LESSONS: <line>`.
    - Option ids: `adopt`, `keep-trial`, `retire`.
-   - `decision_id` is `reveal-<id>`, or `reveal-global-<id>` for a global lesson.
-   - Mark a recommendation only if the blind pick was `with-lesson`.
+   - `decision_id` is `reveal-<id>`, or `reveal-global-<id>` for a global lesson, with `dimension: "adoption"`.
+   - Mark a recommendation only if the blind pick was `with-lesson`. Then run `~/.claude/bin/osm ledger position --run-id <run id> --decision-id <reveal decision_id> --options 3`, put `adopt` at the printed 0-based index with the others in the order above, and set `"position":"run-hash-v1"`. Without a recommendation keep the order above and omit `position`.
 
 Then act on the answer:
 - `adopt`: run `~/.claude/bin/osm ledger lessons adopt <id> [--scope global] --decision <reveal event id> --confirm`.

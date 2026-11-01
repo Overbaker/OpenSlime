@@ -13,7 +13,7 @@ What the installation writes:
 - `~/.claude/bin/osm` (decision-ledger launcher; runs this checkout's `bin/ccg.mjs` with the installing Node)
 - Permission allow entry for `codeagent-wrapper` in `~/.claude/settings.json`
 
-The decision ledger lives in `~/.claude/osm-ledger/`. It is created on the first recorded stage, and init, update and uninstall never modify or delete it.
+The decision ledger lives in `~/.claude/osm-ledger/`. It is created on the first recorded stage, and init, update and uninstall never modify or delete it. `osm ledger render --svg` writes only under `~/.claude/osm-ledger/renders/` unless given `--out`; `summary`, `position` and `render` never write events.
 
 The installer does NOT modify agy settings in `~/.gemini/antigravity-cli/settings.json`.
 

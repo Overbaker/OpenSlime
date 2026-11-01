@@ -311,6 +311,8 @@ export interface LockedContext {
   projectRoot: string
   /** Observed context computed before the lock is taken, so the lock is never held for file scans. */
   context?: ObservedContext
+  /** HOME from the caller's env, for locating ~/.claude.json. */
+  home?: string
   installDir: string
   version: string
   now: Date
@@ -348,7 +350,7 @@ export function commitLocked(ctx: LockedContext, input: EventInput): AppendResul
     operation_key: input.operation_key,
     producer: ctx.version,
     harness: computeHarness(input, ctx.installDir, ctx.version),
-    ...(input.kind === 'stage_completed' ? { context: ctx.context ?? computeContext({ installDir: ctx.installDir, projectRoot: ctx.projectRoot }) } : {}),
+    ...(input.kind === 'stage_completed' ? { context: ctx.context ?? computeContext({ installDir: ctx.installDir, projectRoot: ctx.projectRoot, home: ctx.home }) } : {}),
     payload,
   }
   if (existing) {
@@ -392,6 +394,7 @@ export function resolveContext(opts: AppendOptions): ResolveResult {
       version: opts.version,
       now: opts.now?.() ?? new Date(),
       meta: global ? null : join(projectDir(root, project.id), 'meta.json'),
+      home: (opts.env ?? process.env).HOME,
     },
   }
 }
@@ -431,7 +434,7 @@ export function appendEvent(raw: unknown, opts: AppendOptions): AppendResult {
   const resolved = resolveContext(opts)
   if (!resolved.ok) return resolved.result
   const { ctx } = resolved
-  if (input.kind === 'stage_completed') ctx.context = computeContext({ installDir: ctx.installDir, projectRoot: ctx.projectRoot })
+  if (input.kind === 'stage_completed') ctx.context = computeContext({ installDir: ctx.installDir, projectRoot: ctx.projectRoot, home: ctx.home })
   return underLock(ctx, () => {
     const result = commitLocked(ctx, input)
     if (result.code !== 0 || !opts.after) return result

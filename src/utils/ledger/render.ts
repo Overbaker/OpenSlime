@@ -1,4 +1,5 @@
 import type { Cohort, RuleStatus } from './rules'
+import type { DecisionRow, DimensionView, ItemRow } from './dimensions'
 import type { ParticipantGroup, Summary } from './summary'
 import { PARAMS } from './params'
 
@@ -73,7 +74,9 @@ export function summaryLines(title: string, s: Summary, invalid: number): string
   if (flag.flag) lines.push(`⚠ rubber-stamp risk: ${flag.basis}`)
 
   const c = s.influence.classes
-  lines.push(`Human decisions n=${s.influence.decisions}: adopted ${c.adopted} · reversed ${c.reversed} · overrode ${c.overrode} · unknown ${c.unknown} · first-position ${pct(s.influence.first_position.rate)}${s.influence.blind.n ? ` · blind agreed ${s.influence.blind.agreed}/${s.influence.blind.n}` : ''}`)
+  const fp = s.influence.first_position
+  const first = fp.n ? `first-position ${pct(fp.rate)} (n=${fp.n}, excluded_pre_fix ${fp.excluded_pre_fix})` : `first-position: n/a (${fp.excluded_pre_fix} not randomized)`
+  lines.push(`Human decisions n=${s.influence.decisions}: adopted ${c.adopted} · reversed ${c.reversed} · overrode ${c.overrode} · unknown ${c.unknown} · recommended chosen ${pct(s.influence.recommended_choice_rate)} · ${first}${s.influence.blind.n ? ` · blind agreed ${s.influence.blind.agreed}/${s.influence.blind.n}` : ''}`)
 
   for (const kind of ['verify', 'review'] as const) {
     const rows = s.calibration[kind].filter(r => r.paired > 0)
@@ -124,6 +127,46 @@ export function ruleLines(install: string, current: RuleStatus[], all: RuleStatu
     const cur = current[i]
     const tot = all[i]
     lines.push(`${tot.id} ${tot.rule} [${tot.target}] · current: ${cur.state} (${cur.evidence}) · all: ${tot.state} (${tot.evidence})`)
+  }
+  return lines
+}
+
+function arm(a: ItemRow['with']): string {
+  return `${a.x}/${a.n} (runs ${a.runs})`
+}
+
+function itemRowLine(r: ItemRow): string {
+  const max = PARAMS.stats.maxRows
+  const extra = r.aliased_with.length > max ? `, … +${r.aliased_with.length - max}` : ''
+  const alias = r.aliased_of !== null ? ` · aliased with ${r.aliased_of}` : r.aliased_with.length ? ` · aliased with ${r.aliased_with.slice(0, max).join(', ')}${extra}` : ''
+  const head = `    ${r.metric}: with ${arm(r.with)} · without ${arm(r.without)}`
+  if (r.status === 'no-variation') return `${head} · no-variation${alias}`
+  if (r.status === 'insufficient') return `${head} · insufficient (n_with=${r.with.n}, n_without=${r.without.n})${alias}`
+  const [l, u] = r.interval!
+  return `${head} · diff ${r.diff!.toFixed(4)} [${l.toFixed(4)}, ${u.toFixed(4)}] · z* ${r.z!.toFixed(2)}${r.rejected ? ` · ${r.direction}` : ''}${alias}`
+}
+
+/** One block per item, at most `maxRows` items; the rest are counted, never dropped silently. */
+export function dimensionLines(title: string, v: DimensionView, maxRows = PARAMS.stats.maxRows): string[] {
+  const shown = v.items.length > maxRows ? ` · showing ${maxRows} of ${v.items.length} items` : ''
+  const lines = [`${title} · by ${v.by} (${v.source}) · ${v.note} · Holm m=${v.holm_m}${shown}`]
+  for (const it of v.items.slice(0, maxRows)) {
+    lines.push(`  ${it.item}: ${it.verdict}`)
+    for (const r of it.rows) lines.push(itemRowLine(r))
+    if (it.cost) {
+      const side = (c: NonNullable<typeof it.cost>['with']) => `tokens ${c.tokens ?? 'unknown'} usd ${c.usd ?? 'unknown'} (n=${c.n}, runs ${c.runs})`
+      lines.push(`    cost: with ${side(it.cost.with)} · without ${side(it.cost.without)}${it.cost.label ? ` · ${it.cost.label}` : ''}`)
+    }
+  }
+  return lines
+}
+
+export function decisionLines(title: string, rows: DecisionRow[]): string[] {
+  const lines = [`${title} · decisions by dimension (human vs AI)`]
+  for (const r of rows) {
+    if (!r.n && !r.ai_decisions.reporting) continue
+    const ai = r.ai_decisions.reporting ? `AI decided ${r.ai_decisions.total} (in ${r.ai_decisions.reporting} reports)` : 'AI decided: not reported'
+    lines.push(`  ${r.dimension}: human n=${r.n} · adopted ${r.adopted} · reversed ${r.reversed} · overrode ${r.overrode} · unknown ${r.unknown} · human-initiated ${r.human_initiated} · ${ai}`)
   }
   return lines
 }

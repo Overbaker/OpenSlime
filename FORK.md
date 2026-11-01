@@ -39,6 +39,7 @@ models (Claude Opus/Fable, GPT-codex) already do better without it.
 
 - `~/.claude/osm-ledger/` holds an append-only, user-local JSONL ledger with one file per project. It is written only at stage boundaries: stage confidence, human decisions, probes, later outcomes and lesson state. Nothing runs per turn and there are no hooks.
 - `~/.claude/bin/osm ledger summary | harness | lessons …` is deterministic, makes no model calls, and caps its output.
+- `summary --by <dimension>` gives association-only verdicts (Wilson/Newcombe intervals, minimum samples, Holm correction) for skills, MCP tools and servers, practices, backends, models and more; `--by decision` splits human vs AI decisions per dimension. `render --svg` draws the same view as an anonymized static SVG. Nothing acts on a verdict automatically.
 - Lessons follow [Harness²](https://github.com/google-research/harness2), kept small:
   - A lesson is one evidence-backed brief line.
   - While on trial it is used only by a single-variable challenger.
