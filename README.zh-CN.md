@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/diagrams/hero-dark.svg">
-    <img src="assets/diagrams/hero-light.svg" width="880" alt="OpenSlime：为 Claude Code 设计的多 agent 协同开发，保持轻量、每个阶段都交叉校验、只从证据中学习。0 个 hook，5 个命令，常驻规则 1.4 KB。">
+    <img src="assets/diagrams/hero-light.svg" width="880" alt="OpenSlime：证明什么真正有用、越用越好却不变重的 Claude Code 工作流。两大核心功能：决策账本——按「用了 / 没用」给 skill、MCP 工具和习惯打分，并按决策类型对比你和 AI 的决定；证据驱动的经验——每条经验用单变量挑战者做盲测 A/B，只有你能采纳。0 个 hook，5 个命令，常驻 1.4 KB。">
   </picture>
 </p>
 
@@ -9,12 +9,51 @@
   <img src="https://img.shields.io/badge/for-Claude%20Code-111111?style=flat-square" alt="For Claude Code">
   <img src="https://img.shields.io/badge/built%20on-OpenSpec-111111?style=flat-square" alt="Built on OpenSpec">
   <img src="https://img.shields.io/badge/hooks-none-3fb98a?style=flat-square" alt="No hooks">
+  <img src="https://img.shields.io/badge/decision-ledger-3fb98a?style=flat-square" alt="Decision ledger">
+  <img src="https://img.shields.io/badge/lessons-blind%20A%2FB-8b7fd0?style=flat-square" alt="Lessons tested by blind A/B">
   <img src="https://img.shields.io/badge/license-MIT-111111?style=flat-square" alt="MIT license">
 </p>
 
 <p align="center"><sub><a href="README.md">English</a> &middot; 简体中文</sub></p>
 
 ---
+
+## 两大核心功能
+
+### ① 决策账本：知道什么真正有用，以及到底是谁做的决定
+
+大多数 agent 配置靠感觉堆 skill、MCP 和习惯。OpenSlime 给它们记分。
+
+- **逐项对比「用了 / 没用」。** 每个 skill、MCP 工具或服务器、习惯、后端、模型、阶段和变更类型，都把 run 分成用了和没用两组，比较后续 Critical、verify 失败和被采纳的发现。
+- **结论经得起推敲。** 只有两组各有 ≥10 个样本、来自 ≥5 个 run，Newcombe 区间不含 0，并通过全体 Holm 校正，才标「关联更好 / 更差」；否则只说「证据不足」，绝不猜。
+- **成本放在一起看。** 两组的平均 token 和美元，直接标出「花得多、没更好」。
+- **你和 AI 各占多少。** 按 scope、design、backend、skill、permissions、acceptance、adoption 统计你采纳、推翻、被扭转的次数，以及 AI 自己拍板的次数。推荐项按 run 哈希摆位，「随手选第一个」冒充不了「同意」。
+- **不占上下文。** 全在你自己的终端里跑，结果确定，不调用模型：`osm ledger summary --by skill`、`--by decision`、`osm ledger render --svg`。
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/diagrams/dimensions-dark.svg">
+    <img src="assets/diagrams/dimensions-light.svg" width="880" alt="账本示意图：CLI 观测到的配置、agent 自报的使用情况和你的决定，写进本机只追加的账本；终端里按任意维度报告关联更好或更差的项、各维度的决策和每组成本。">
+  </picture>
+</p>
+
+### ② 证据驱动的经验：越用越好，却不会变重
+
+借鉴 [Harness²](https://github.com/google-research/harness2)，保持轻量。
+
+- **一行、一个变量。** 一条 lesson 只是 brief 里的一行。试用期只发给挑战者，挑战者和主执行者只差这一行。
+- **盲测 A/B。** 审查者只看到 A 和 B，按 VERIFY、Critical、Warning 依次判胜负，diff 大小不计分。
+- **你来采纳，先盲选。** 你先在不知道哪边带 lesson 的情况下二选一，再看揭晓。不经过你，什么都进不了主 brief。
+- **坏主意自动退役。** 输掉的 lesson 自动退役。OpenSlime 自己的规则（H-0001…H-0005）也同样被跟踪。
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/diagrams/lesson-loop-dark.svg">
+    <img src="assets/diagrams/lesson-loop-light.svg" width="880" alt="OpenSlime 如何学习：证据变成一条试用中的 lesson，只发给挑战者。探测用同一个执行者、同一个 skill、同一个基线跑两次，两次的区别只有一行 LESSONS；审查者只看到 A 和 B。按 VERIFY、Critical、Warning 的顺序判胜负。你先盲选再揭晓，然后决定把 lesson 采纳进主 brief，或者退役。OpenSlime 自己的规则也按同样方式跟踪。">
+  </picture>
+</p>
+
+> **自己先用。** 开发这个版本时，账本对一条试用 lesson 做了盲测，记录到一次严重失败并自动将其退役；它还显示 Claude 自评的置信度*低于*实际（自评约 70%，而这些阶段约 83% 在后续审查中没有 Critical），以及 8 次推荐中有 2 次被人推翻。
 
 ## 安装
 
@@ -53,14 +92,7 @@ Install OpenSlime from https://github.com/Overbaker/OpenSlime. Follow AGENTS.md 
 - **始终交叉校验。** research、plan、review 都让 codex 和 antigravity 各自在新会话里独立完成，由 Claude 对比两者一致和分歧的地方。
 - **阶段报告。** 每次运行结束都在 `${TMPDIR:-/tmp}/osm-reports/` 生成一份报告，附带置信度（高/中/低，百分比）。
 
-## 决策账本与经验
-
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/diagrams/lesson-loop-dark.svg">
-    <img src="assets/diagrams/lesson-loop-light.svg" width="880" alt="OpenSlime 如何学习：证据变成一条试用中的 lesson，只发给挑战者。探测用同一个执行者、同一个 skill、同一个基线跑两次，两次的区别只有一行 LESSONS；审查者只看到 A 和 B。按 VERIFY、Critical、Warning 的顺序判胜负。你先盲选再揭晓，然后决定把 lesson 采纳进主 brief，或者退役。OpenSlime 自己的规则也按同样方式跟踪。">
-  </picture>
-</p>
+## 账本细节
 
 - **决策账本。** 每个阶段往 `~/.claude/osm-ledger/` 追加一行，记录这几样：
   - 该阶段给出的置信度；
@@ -76,6 +108,10 @@ Install OpenSlime from https://github.com/Overbaker/OpenSlime. Follow AGENTS.md 
     - 你的选择有多少次采纳了 AI 推荐、推翻了推荐，或在 AI 介入后改了主意；
     - 如果你几乎总是直接接受，会给出橡皮图章提醒。
   - `~/.claude/bin/osm ledger summary --by-harness`：OpenSlime 自己的 prompt 或参数每改一次，就对比改动前后的上述数字。
+  - `~/.claude/bin/osm ledger summary --by <维度>`：按 skill、MCP 工具或服务器、习惯、输出样式、后端、角色、模型、阶段、变更类型或时间窗口，把阶段分成「用了 / 没用」两组对比。只有两组都有足够的 run，且通过 Holm 校正，才标为「关联更好」或「关联更差」；同时给出两组的平均成本，并标出「花得多、没更好」。这只是关联，不是因果，不会自动改动任何东西。
+  - `~/.claude/bin/osm ledger summary --by decision`：按决策维度（scope、design、backend、skill、permissions、acceptance、adoption）统计你采纳、推翻、被 AI 扭转的次数，以及 AI 自己做了多少决定。推荐项放在按 run 哈希决定的位置，所以能区分「随手选了第一个」和「真的同意」。
+  - `~/.claude/bin/osm ledger render --svg`：把这个视图生成浅色、深色两张 SVG，写到 `~/.claude/osm-ledger/renders/`，不含变更 id、话题或路径。
+
 - **经验（lesson），借鉴 [Harness²](https://github.com/google-research/harness2)，保持轻量。** 一条 lesson 就是给执行者 brief 加的一行，必须有证据支撑。
   - 试用期间只发给挑战者。挑战者和主执行者完全相同，只多这一行。
   - 两边结果以 A/B 形式盲审，按 VERIFY、Critical、Warning 的顺序判胜负，diff 大小不计分。
@@ -93,19 +129,12 @@ Install OpenSlime from https://github.com/Overbaker/OpenSlime. Follow AGENTS.md 
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/diagrams/footprint-dark.svg">
-    <img src="assets/diagrams/footprint-light.svg" width="880" alt="与上游 ccg-workflow 51b1e00 的体积对比：斜杠命令 19 到 5，hook 脚本 5 到 0，常驻规则 11,846 到 1,385 字节，模板 1.34 MB 到 0.67 MB。">
+    <source media="(prefers-color-scheme: dark)" srcset="assets/diagrams/compare-dark.svg">
+    <img src="assets/diagrams/compare-light.svg" width="880" alt="与 ccg-workflow 51b1e00 对比：hook 脚本 5 到 0，常驻规则 11.8 KB 到 1.4 KB，斜杠命令 19 到 5。">
   </picture>
 </p>
 
-| | 上游 `51b1e00` | OpenSlime |
-| --- | ---: | ---: |
-| 斜杠命令 | 19 | 5 |
-| Claude Code hook 脚本 | 5 | 0 |
-| 常驻规则 | 3 个文件，11,846 B | 1 个文件，1,385 B |
-| 模板 | 260 个文件，1,338,837 B | 152 个文件，668,029 B |
-
-<sub>用 `git ls-tree` 在上游 `51b1e00` 和本次变更之前的提交上测得。账本只新增一个按需读取的 prompt（`osm-ledger.md`），不新增任何常驻文本。</sub>
+<sub>用 `git ls-tree` 在上游 `51b1e00` 测得：常驻规则 11,846 B → 1,385 B；模板 1,338,837 B → 668,029 B。账本只新增按需读取的 prompt，不新增常驻文本。</sub>
 
 - **不做每轮注入。** 没有 hook，只有一个很小的常驻规则（`rules/ccg-codegraph.md`）。技能（`frontend-design`、`scrapling`、`seo-page-builder`、`bt-panel`、`adsense-site-auditor`）只在调用时加载。输出样式保留 Claude Code 内置的编码规范。
 - **单一主循环。** Claude 负责规划、决策并与你对话，前面没有路由层。

@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="262" viewBox="0 0 960 262" role="img" aria-label="Compared with ccg-workflow 51b1e00: hook scripts 5 to 0, always-on rules 11.8 KB to 1.4 KB, slash commands 19 to 5.">
+<title>Compared with ccg-workflow 51b1e00: hook scripts 5 to 0, always-on rules 11.8 KB to 1.4 KB, slash commands 19 to 5.</title>
+<defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M1 1L9 5L1 9" fill="none" stroke="#b7bec7" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></marker>
+  <marker id="ahg" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M1 1L9 5L1 9" fill="none" stroke="#3fb98a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></marker>
+  <radialGradient id="glow" cx="0.18" cy="0.42" r="0.55"><stop offset="0" stop-color="#3fb98a" stop-opacity="0.22"/><stop offset="1" stop-color="#3fb98a" stop-opacity="0"/></radialGradient>
+  <linearGradient id="sheen" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f7f9f8"/><stop offset="1" stop-color="#ffffff"/></linearGradient>
+</defs>
+<rect x="0.5" y="0.5" width="959" height="261" rx="18" fill="url(#sheen)" stroke="#e3e7ea" stroke-width="1"/>
+<text x="40" y="56" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="24" font-weight="700" fill="#16181d" text-anchor="start">Compared with ccg-workflow 51b1e00</text>
+<text x="40" y="80" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#5b6170" text-anchor="start">Measured with git ls-tree on both commits.</text>
+<rect x="40" y="106" width="280" height="120" rx="14" fill="#ffffff" stroke="#e3e7ea" stroke-width="1"/>
+<text x="60" y="138" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" font-weight="600" fill="#16181d" text-anchor="start">Hook scripts</text>
+<text x="60" y="184" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"><tspan font-size="22" fill="#8b7fd0" text-decoration="line-through">5</tspan><tspan dx="10" font-size="22" fill="#7b8290">→</tspan><tspan dx="10" font-size="34" font-weight="700" fill="#2f9e76">0</tspan></text>
+<text x="60" y="212" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#7b8290" text-anchor="start">nothing runs per turn</text>
+<rect x="340" y="106" width="280" height="120" rx="14" fill="#ffffff" stroke="#e3e7ea" stroke-width="1"/>
+<text x="360" y="138" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" font-weight="600" fill="#16181d" text-anchor="start">Always-on rules</text>
+<text x="360" y="184" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"><tspan font-size="22" fill="#8b7fd0" text-decoration="line-through">11.8 KB</tspan><tspan dx="10" font-size="22" fill="#7b8290">→</tspan><tspan dx="10" font-size="34" font-weight="700" fill="#2f9e76">1.4 KB</tspan></text>
+<text x="360" y="212" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#7b8290" text-anchor="start">loaded in every session</text>
+<rect x="640" y="106" width="280" height="120" rx="14" fill="#ffffff" stroke="#e3e7ea" stroke-width="1"/>
+<text x="660" y="138" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" font-weight="600" fill="#16181d" text-anchor="start">Slash commands</text>
+<text x="660" y="184" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"><tspan font-size="22" fill="#8b7fd0" text-decoration="line-through">19</tspan><tspan dx="10" font-size="22" fill="#7b8290">→</tspan><tspan dx="10" font-size="34" font-weight="700" fill="#2f9e76">5</tspan></text>
+<text x="660" y="212" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#7b8290" text-anchor="start">research → review</text>
+</svg>

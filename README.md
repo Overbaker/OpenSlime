@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/diagrams/hero-dark.svg">
-    <img src="assets/diagrams/hero-light.svg" width="880" alt="OpenSlime: multi-agent development for Claude Code that stays small, cross-checks every stage, and learns only from evidence. 0 hooks, 5 commands, 1.4 KB always-on.">
+    <img src="assets/diagrams/hero-light.svg" width="880" alt="OpenSlime: Claude Code that proves what helps and gets better without getting heavier. Two core features: the decision ledger, which scores skills, MCP tools and habits with and without and shows your decisions versus the AI per decision type; and evidence-gated lessons, tested by blind A/B on a single-variable challenger and adopted only by you. 0 hooks, 5 commands, 1.4 KB always-on.">
   </picture>
 </p>
 
@@ -9,12 +9,51 @@
   <img src="https://img.shields.io/badge/for-Claude%20Code-111111?style=flat-square" alt="For Claude Code">
   <img src="https://img.shields.io/badge/built%20on-OpenSpec-111111?style=flat-square" alt="Built on OpenSpec">
   <img src="https://img.shields.io/badge/hooks-none-3fb98a?style=flat-square" alt="No hooks">
+  <img src="https://img.shields.io/badge/decision-ledger-3fb98a?style=flat-square" alt="Decision ledger">
+  <img src="https://img.shields.io/badge/lessons-blind%20A%2FB-8b7fd0?style=flat-square" alt="Lessons tested by blind A/B">
   <img src="https://img.shields.io/badge/license-MIT-111111?style=flat-square" alt="MIT license">
 </p>
 
 <p align="center"><sub>English &middot; <a href="README.zh-CN.md">简体中文</a></sub></p>
 
 ---
+
+## Two core features
+
+### ① Decision ledger: know what actually helps, and who really decided
+
+Most agent setups pile on skills, MCP servers and habits on faith. OpenSlime keeps score.
+
+- **With vs. without, per item.** Every skill, MCP tool or server, practice, backend, model, stage and change kind is split into runs *with* it and *without* it, and compared on later Critical findings, verify failures and accepted findings.
+- **Verdicts you can trust.** "Associated better" or "worse" appears only with ≥10 samples from ≥5 runs on each side, a Newcombe interval that excludes zero, and Holm correction across everything tested. Otherwise it says *insufficient*, never a guess.
+- **Cost on the same page.** Mean tokens and USD per side, with a plain flag: *costs more, not better*.
+- **You vs. the AI.** For scope, design, backend, skill, permissions, acceptance and adoption: how often you adopted, overrode or were turned around, and how many calls the AI made alone. Recommendations sit at a run-hashed position, so "picked the first option" can't pass for "agreed".
+- **Zero context cost.** It all runs in your own terminal, deterministic, no model calls: `osm ledger summary --by skill`, `--by decision`, `osm ledger render --svg`.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/diagrams/dimensions-dark.svg">
+    <img src="assets/diagrams/dimensions-light.svg" width="880" alt="The ledger schematic: what the CLI observes, what agents self-report and your decisions go into an append-only ledger on your machine; your terminal reports items associated better or worse, decisions per dimension and cost per arm, grouped by any dimension.">
+  </picture>
+</p>
+
+### ② Evidence-gated lessons: it learns, but never gets heavier
+
+Inspired by [Harness²](https://github.com/google-research/harness2), kept small.
+
+- **One line, one variable.** A lesson is a single brief line. On trial it only reaches a challenger that is identical to the main writer except for that line.
+- **Blind A/B.** Reviewers see two candidates as A and B. VERIFY first, then Criticals, then Warnings; diff size never counts.
+- **You adopt, blind first.** You pick between the two diffs without knowing which had the lesson, then see the reveal. Nothing reaches the main brief without you.
+- **Bad ideas retire themselves.** A lesson that loses is retired automatically. OpenSlime's own rules (H-0001…H-0005) are tracked the same way.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/diagrams/lesson-loop-dark.svg">
+    <img src="assets/diagrams/lesson-loop-light.svg" width="880" alt="How OpenSlime learns. Evidence becomes a trial lesson that reaches only a challenger. A probe runs the same writer, skill and base twice, differing by one LESSONS line, and reviewers see the two results only as A and B. The result is scored by VERIFY, then Critical, then Warning findings. You decide with a blind pick, then a reveal, and the lesson is adopted into the main brief or retired. OpenSlime's own rules are tracked the same way.">
+  </picture>
+</p>
+
+> **Dogfooded.** While building this release, the ledger blind-tested a trial lesson, recorded a severe loss and retired it on its own. It also showed Claude's stated confidence running *below* reality (stated ~70%, while ~83% of those stages later passed review with no Critical), and that the human overrode 2 of 8 recommendations.
 
 ## Install
 
@@ -50,14 +89,7 @@ Manual steps: [AGENTS.md](AGENTS.md).
 - **Always cross-checked.** Research, plan and review run codex and antigravity in separate fresh sessions, and Claude compares where they agree and where they don't.
 - **Stage report.** Every run ends with a report in `${TMPDIR:-/tmp}/osm-reports/` that includes a confidence estimate (High/Medium/Low, %).
 
-## Ledger and lessons
-
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/diagrams/lesson-loop-dark.svg">
-    <img src="assets/diagrams/lesson-loop-light.svg" width="880" alt="How OpenSlime learns. Evidence becomes a trial lesson that reaches only a challenger. A probe runs the same writer, skill and base twice, differing by one LESSONS line, and reviewers see the two results only as A and B. The result is scored by VERIFY, then Critical, then Warning findings. You decide with a blind pick, then a reveal, and the lesson is adopted into the main brief or retired. OpenSlime's own rules are tracked the same way.">
-  </picture>
-</p>
+## Ledger reference
 
 - **Decision ledger.**
   - Each stage appends one line to `~/.claude/osm-ledger/`. Recorded: the confidence it stated, the decisions you made, probe results, and what later reviews found.
@@ -66,6 +98,10 @@ Manual steps: [AGENTS.md](AGENTS.md).
 - **See it without spending context.** Run these in your own terminal:
   - `~/.claude/bin/osm ledger summary` shows each backend's or skill's contribution (keep / revisit / not enough data), confidence vs. later outcomes, and how often your choice matched, overrode or reversed the AI's recommendation, with a rubber-stamp warning.
   - `~/.claude/bin/osm ledger summary --by-harness` compares those numbers before and after each change to OpenSlime's own prompts or parameters.
+  - `~/.claude/bin/osm ledger summary --by <dimension>` splits stages into with / without each skill, MCP tool or server, practice, output style, backend, role, model, stage, change kind or time window. An item is called associated better or worse only with enough runs on both sides and after Holm correction; mean cost per side is shown, and "costs more, not better" is flagged. Associations, not causes: nothing changes automatically.
+  - `~/.claude/bin/osm ledger summary --by decision` shows, per decision dimension (scope, design, backend, skill, permissions, acceptance, adoption), how often you adopted, overrode or reversed the AI, and how many decisions the AI made alone. Recommendations are placed at a run-hashed position, so "picked the first option" can be told apart from "agreed".
+  - `~/.claude/bin/osm ledger render --svg` writes a light and a dark SVG of that view under `~/.claude/osm-ledger/renders/`, with no change ids, topics or paths in it.
+
 - **Lessons ([Harness²](https://github.com/google-research/harness2), kept small).**
   - A lesson is one line for a writer's brief, backed by evidence.
   - While on trial, it only reaches a challenger that is identical to the main writer except for that line. Both results are reviewed blind as A/B and scored on VERIFY, then Criticals, then Warnings; diff size never counts.
@@ -80,19 +116,12 @@ Manual steps: [AGENTS.md](AGENTS.md).
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/diagrams/footprint-dark.svg">
-    <img src="assets/diagrams/footprint-light.svg" width="880" alt="Footprint versus upstream ccg-workflow 51b1e00: slash commands 19 to 5, hook scripts 5 to 0, always-on rules 11,846 to 1,385 bytes, templates 1.34 MB to 0.67 MB.">
+    <source media="(prefers-color-scheme: dark)" srcset="assets/diagrams/compare-dark.svg">
+    <img src="assets/diagrams/compare-light.svg" width="880" alt="Compared with ccg-workflow 51b1e00: hook scripts 5 to 0, always-on rules 11.8 KB to 1.4 KB, slash commands 19 to 5.">
   </picture>
 </p>
 
-| | Upstream `51b1e00` | OpenSlime |
-| --- | ---: | ---: |
-| Slash commands | 19 | 5 |
-| Claude Code hook scripts | 5 | 0 |
-| Always-on rules | 3 files, 11,846 B | 1 file, 1,385 B |
-| Templates | 260 files, 1,338,837 B | 152 files, 668,029 B |
-
-<sub>Measured with `git ls-tree` on upstream `51b1e00` and on the commit before this change. The ledger adds one on-demand prompt (`osm-ledger.md`) and no always-on text.</sub>
+<sub>Measured with `git ls-tree` at upstream `51b1e00`: always-on rules 11,846 B → 1,385 B; templates 1,338,837 B → 668,029 B. The ledger adds on-demand prompts only, no always-on text.</sub>
 
 - **Nothing per turn.** There are no hooks and one small always-on rule (`rules/ccg-codegraph.md`). Skills (`frontend-design`, `scrapling`, `seo-page-builder`, `bt-panel`, `adsense-site-auditor`) load only when called. Output styles keep Claude Code's built-in coding instructions.
 - **One main loop.** Claude plans, decides and talks to you; no router sits in front of it.
