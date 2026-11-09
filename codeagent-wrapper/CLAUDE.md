@@ -3,14 +3,14 @@
 > [根目录](../CLAUDE.md) > **codeagent-wrapper**
 
 **Last Updated**: 2026-08-29
-**Binary Version**: v5.15.0
+**Binary Version**: v5.16.0
 **Go Version**: 1.21+（`go.mod:1`）
 
 ---
 
 ## 模块职责
 
-`codeagent-wrapper` 是用 Go 编写的跨平台 CLI 包装器，通过 `Backend` 接口 + `backendRegistry` 工厂将 **7 种 AI CLI 后端**（Codex / Gemini / Claude / Grok / Kimi / OpenCode / Antigravity）统一成一个标准接口。CCG 工作流系统中的 20+ 个斜杠命令通过调用它来执行多模型协作任务——Claude 作为编排层，codeagent-wrapper 负责实际派发、执行、输出解析和会话管理。
+`codeagent-wrapper` 是用 Go 编写的跨平台 CLI 包装器，通过 `Backend` 接口 + `backendRegistry` 工厂将 **8 种 AI CLI 后端**（Codex / Gemini / Claude / Grok / Kimi / OpenCode / Antigravity / Pi）统一成一个标准接口。CCG 工作流系统中的 20+ 个斜杠命令通过调用它来执行多模型协作任务——Claude 作为编排层，codeagent-wrapper 负责实际派发、执行、输出解析和会话管理。
 
 ---
 
@@ -25,10 +25,10 @@
 
 ```bash
 # 单任务模式（新会话）
-codeagent-wrapper [--backend <codex|gemini|claude>] "任务文本" [工作目录]
+codeagent-wrapper [--backend <codex|gemini|claude|pi>] "任务文本" [工作目录]
 
 # stdin 模式（处理含换行/特殊字符的任务）
-codeagent-wrapper [--backend <codex|gemini|claude>] - [工作目录] <<'EOF'
+codeagent-wrapper [--backend <codex|gemini|claude|pi>] - [工作目录] <<'EOF'
 任务文本
 EOF
 
@@ -48,7 +48,8 @@ codeagent-wrapper --cleanup
 
 | Flag | 说明 | 默认值 |
 |------|------|--------|
-| `--backend <name>` | 指定后端：`codex`、`gemini`、`claude` | `codex` |
+| `--backend <name>` | 指定后端：`codex`、`gemini`、`claude`、`antigravity`、`grok`、`kimi`、`opencode`、`pi` | `codex` |
+| `--pi-model <name>` | Pi 的 `provider/model` 或唯一模型 ID；也可用 `PI_MODEL`。长上下文/provider 配置由 Pi 管理 | 空（Pi 默认） |
 | `--gemini-model <name>` | Gemini 型号（仅 gemini 后端有效） | 空（后端默认） |
 | `--progress` | 向 stderr 输出紧凑进度行 | 关 |
 | `--with-mcp` | 让子代理加载 MCP servers。默认跳过：grok/kimi 走影子 HOME（v3.3.0），codex 注入 `-c mcp_servers={}`、gemini 注入哨兵 allowlist（v5.15.0）。⚠ **见下方「谁必须开这个 flag」** | 关 |
@@ -90,6 +91,8 @@ diff、明令禁改文件）与修正调用（按 file:line 改）**不开**，�
 | `CODEAGENT_POST_MESSAGE_DELAY` | agent_message 后等待秒数（0-60） | 5s |
 | `CODEAGENT_MAX_PARALLEL_WORKERS` | 并行 worker 上限（0=不限） | 0 |
 | `GEMINI_MODEL` | Gemini 型号（低优先级，CLI 参数覆盖） | 空 |
+| `PI_MODEL` | Pi 模型，CLI `--pi-model` 优先；并行模式通过此变量选择 | 空 |
+| `CODEAGENT_PI_COMMAND` | 覆盖 Pi 可执行文件（测试/自定义安装） | `pi` |
 
 ### 退出码
 
@@ -129,14 +132,24 @@ type Backend interface {
 | `kimi` | `kimi` | `buildKimiArgs()` |
 | `opencode` | `opencode` | `buildOpencodeArgs()` |
 | `antigravity` / `agy` | `agy` | `buildAntigravityArgs()` |
+| `pi` | `pi` | `PiBackend.BuildArgs()` |
 
-**加一个后端**：主路径干净 —— 在 `backend.go` 写个 struct 实现 `Backend` 三方法 + 在 `config.go` 的 `backendRegistry` 注册一行即可。此外需手动碰约 12 处后端字符串特判：`server.go`（SSE 输出格式，~4 处）、`executor.go`（stdin/prompt 传递方式 `line 877-878`、`case "codex"` `line 1018`，~4 处）、`main.go`（flag 校验，~4 处）。`parser.go` 已统一（靠 JSON 事件形状识别后端，0 处特判）。若加后端变频繁，可给 `Backend` 接口加 `PromptMode()` / `SSEFormat()` 把这 12 处也收编——半天~1 天渐进重构，非大工程。
+**加一个后端**：主路径干净 —— 在 `backend.go` 写个 struct 实现 `Backend` 三方法 + 在 `config.go` 的 `backendRegistry` 注册一行即可。此外需手动碰约 12 处后端字符串特判：`server.go`（SSE 输出格式，~4 处）、`executor.go`（stdin/prompt 传递方式 `line 877-878`、`case "codex"` `line 1018`，~4 处）、`main.go`（flag 校验，~4 处）。Pi 使用独立 `pi_parser.go` 解析 RPC，其余后端的 `parser.go` 靠 JSON 事件形状识别（0 处特判）。若加后端变频繁，可给 `Backend` 接口加 `PromptMode()` / `SSEFormat()` 把这 12 处也收编——半天~1 天渐进重构，非大工程。
 
 ### stdin 传递协议
 
 当任务文本包含以下特殊字符时自动切换 stdin 模式（`main.go:22`）：
 - 换行 `\n`、反斜杠 `\`、双引号 `"`、单引号 `'`、反引号 `` ` ``、`$`
 - 或任务文本长度 > 800 字符
+
+Pi 始终使用 JSONL RPC stdin 发送 `get_state` 和 `prompt`，任务不会作为 argv 传给 Pi，
+所以 multiline、`@` 前缀和 shell 符号均按字面量处理。`get_state` 用于发现 session ID，
+`prompt` 的 response 仅表示已接收；以 `agent_settled` 为完成信号，再关闭 stdin。
+assistant `text_delta` 持续流式返回，最终 assistant message 提供完整结果。RPC 拒绝、
+provider 错误、重试耗尽、`error`/`aborted` stop reason 和读取错误均使任务退出非零。
+resume 通过 `--session <id>` 恢复。启动时默认禁用 extensions、skills、prompt templates
+和 MCP，RPC 是本地子进程（provider 可以本地或远程），并非远程 Pi server transport。
+完整用户说明见 [Pi RPC 后端](../docs/pi-backend.zh-CN.md)。
 
 Gemini 平台差异（`executor.go:864`）：
 - **macOS/Linux**：`-p "<任务文本>"` 直接传参（execve 保留多行 argv）
@@ -185,7 +198,7 @@ id: task-b
 
 | 文件 | 职责 |
 |------|------|
-| `backend.go` | `Backend` 接口；7 个实现 `CodexBackend` / `GeminiBackend` / `ClaudeBackend` / `GrokBackend` / `KimiBackend` / `OpencodeBackend` / `AntigravityBackend`；各自 `buildXxxArgs()`；`loadMinimalEnvSettings()` 读取 `~/.claude/settings.json` 注入环境变量 |
+| `backend.go` | `Backend` 接口；7 个原有实现 `CodexBackend` / `GeminiBackend` / `ClaudeBackend` / `GrokBackend` / `KimiBackend` / `OpencodeBackend` / `AntigravityBackend`；各自 `buildXxxArgs()`；`loadMinimalEnvSettings()` 读取 `~/.claude/settings.json` 注入环境变量 |
 
 ### 执行层
 
@@ -204,6 +217,8 @@ id: task-b
 
 | 文件 | 职责 |
 |------|------|
+| `pi.go` | 第 8 个 `PiBackend`；严格 RPC 参数，包含 `--session`、`--model` 和确定性隔离 flags；`buildPiRPCInput()` 序列化 stdin |
+| `pi_parser.go` | `parsePiRPCStream()`——RPC 状态、错误、token/工具进度和 settled 完成协议 |
 | `parser.go` | `parseJSONStreamInternal()`——流式解析 Codex / Claude / Gemini JSON 事件；提取 `agent_message`、`session_id`；支持进度回调 `onProgressCallback`、session 回调 `onSessionStartedCallback` |
 | `filter.go` | `filteringWriter`——过滤 stderr 噪声行（`[STARTUP]`、`YOLO mode`、Node.js warning 等） |
 
@@ -297,8 +312,8 @@ bash build-all.sh
 
 | 文件 | 位置 | 当前值 |
 |------|------|--------|
-| `codeagent-wrapper/main.go` | `version = "..."` （`main.go:17`） | `5.15.0` |
-| `src/utils/installer.ts` | `EXPECTED_BINARY_VERSION = '...'` | `5.15.0` |
+| `codeagent-wrapper/main.go` | `version = "..."` （`main.go:17`） | `5.16.0` |
+| `src/utils/installer.ts` | `EXPECTED_BINARY_VERSION = '...'` | `5.16.0` |
 
 两边不一致的后果：用户运行 `npx ccg-workflow update` 时无法触发 binary 重新下载，继续使用旧版 binary。
 

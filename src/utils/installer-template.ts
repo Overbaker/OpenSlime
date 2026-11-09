@@ -71,6 +71,7 @@ export function injectConfigVariables(content: string, config: {
     grokModel?: string
     kimiModel?: string
     opencodeModel?: string
+    piModel?: string
   }
   mcpProvider?: string
 }): string {
@@ -213,6 +214,30 @@ export function injectConfigVariables(content: string, config: {
         return line.replace(/\{\{OPENCODE_MODEL_FLAG\}\}/g, '')
       }
       return line.replace(/\{\{OPENCODE_MODEL_FLAG\}\}/g, opencodeModelFlagValue)
+    }).join('\n')
+  }
+
+  // Pi model flag — optional; Pi owns all provider and context-window settings.
+  const piModel = (routing.piModel || '').trim()
+  const usesPi = frontendPrimary === 'pi' || backendPrimary === 'pi'
+    || frontendModels.includes('pi') || backendModels.includes('pi')
+
+  if (!usesPi || !piModel) {
+    processed = processed.replace(/\{\{PI_MODEL_FLAG\}\}/g, '')
+  }
+  else {
+    const piModelFlagValue = `--pi-model ${piModel} `
+    const hardCodedBackendRe = /--backend\s+([a-z0-9-]+)(?:\s|$)/
+
+    processed = processed.split('\n').map((line) => {
+      if (!line.includes('{{PI_MODEL_FLAG}}')) {
+        return line
+      }
+      const m = line.match(hardCodedBackendRe)
+      if (m && m[1] !== 'pi') {
+        return line.replace(/\{\{PI_MODEL_FLAG\}\}/g, '')
+      }
+      return line.replace(/\{\{PI_MODEL_FLAG\}\}/g, piModelFlagValue)
     }).join('\n')
   }
 

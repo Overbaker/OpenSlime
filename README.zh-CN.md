@@ -139,7 +139,7 @@ Install OpenSlime from https://github.com/Overbaker/OpenSlime. Follow AGENTS.md 
 - **不做每轮注入。** 没有 hook，只有一个很小的常驻规则（`rules/ccg-codegraph.md`）。技能（`frontend-design`、`scrapling`、`seo-page-builder`、`bt-panel`、`adsense-site-auditor`）只在调用时加载。输出样式保留 Claude Code 内置的编码规范。
 - **单一主循环。** Claude 负责规划、决策并与你对话，前面没有路由层。
 - **外部模型只用在值得的地方：** 限定范围的编写，或者在新会话里给出第二意见。
-  - 保留：Codex 主导模式（`node bin/ccg.mjs codex-mode install`），以及全部 wrapper 后端（`codex`、`claude`、`gemini`、`antigravity`、`grok`、`kimi`、`opencode`）。
+  - 保留：Codex 主导模式（`node bin/ccg.mjs codex-mode install`），以及全部 wrapper 后端（`codex`、`claude`、`gemini`、`antigravity`、`grok`、`kimi`、`opencode`、`pi`）。Pi 使用结构化 RPC 和可恢复 session；provider 与上下文窗口由 Pi 配置，[详见接入说明](docs/pi-backend.zh-CN.md)。
   - 不支持：把 DeepSeek Harness 作为宿主。
 
 设计原则见 [PRINCIPLES.md](PRINCIPLES.md)。

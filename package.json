@@ -55,6 +55,7 @@
     "templates/prompts/grok/",
     "templates/prompts/kimi/",
     "templates/prompts/opencode/",
+    "templates/prompts/pi/",
     "templates/output-styles/",
     "templates/skills/adsense-site-auditor/",
     "templates/skills/bt-panel/",

@@ -48,6 +48,7 @@ const BACKENDS: Record<string, { label: string, commands: string[], windows: str
   kimi: { label: 'Kimi Code CLI', commands: ['kimi'], windows: ['kimi.exe'] },
   grok: { label: 'Grok CLI', commands: ['grok'], windows: ['grok.exe'] },
   opencode: { label: 'OpenCode CLI', commands: ['opencode'], windows: ['opencode.exe', 'opencode.cmd'] },
+  pi: { label: 'Pi Coding Agent', commands: ['pi'], windows: ['pi.exe', 'pi.cmd'] },
 }
 
 function record(value: unknown): RecordValue {

@@ -52,7 +52,7 @@ description: 'codex/antigravity 按任务写代码，Claude 监控审查 + 归�
 
    For each task (independent tasks with disjoint files may go in one `--parallel` batch; use `dependencies:` for ordering):
    ```
-   ~/.claude/bin/codeagent-wrapper --progress --backend <{{BACKEND_PRIMARY}}|{{FRONTEND_PRIMARY}}> {{GEMINI_MODEL_FLAG}}{{GROK_MODEL_FLAG}}{{KIMI_MODEL_FLAG}}{{OPENCODE_MODEL_FLAG}}- "{{WORKDIR}}" <<'EOF'
+   ~/.claude/bin/codeagent-wrapper --progress --backend <{{BACKEND_PRIMARY}}|{{FRONTEND_PRIMARY}}> {{GEMINI_MODEL_FLAG}}{{GROK_MODEL_FLAG}}{{KIMI_MODEL_FLAG}}{{OPENCODE_MODEL_FLAG}}{{PI_MODEL_FLAG}}- "{{WORKDIR}}" <<'EOF'
    ROLE_FILE: ~/.claude/.ccg/prompts/<model you call>/builder.md
    You are authorized to edit files in {{WORKDIR}} for this task only.
    TASK: <task from tasks.md>
@@ -85,7 +85,7 @@ description: 'codex/antigravity 按任务写代码，Claude 监控审查 + 归�
    **FIRST Bash call ({{BACKEND_PRIMARY}})**:
    ```
    Bash({
-     command: "~/.claude/bin/codeagent-wrapper --progress --backend {{BACKEND_PRIMARY}} {{GEMINI_MODEL_FLAG}}{{GROK_MODEL_FLAG}}{{KIMI_MODEL_FLAG}}{{OPENCODE_MODEL_FLAG}}- \"{{WORKDIR}}\" <<'EOF'\nROLE_FILE: ~/.claude/.ccg/prompts/{{BACKEND_PRIMARY}}/reviewer.md\nReview the uncommitted changes for <task> against the spec constraints. Read callers of every changed function, not only the diff.\nMain candidate: {{WORKDIR}}; inspect `git -C \"{{WORKDIR}}\" diff` and its changed files. With --compare explore, also inspect comparison candidate at <worktree>, base commit <base>: `git -C \"<worktree>\" diff <base>` and its changed files. Report findings separately for each candidate, including candidate name on every finding.\nOUTPUT: JSON with findings per candidate\nEOF",
+     command: "~/.claude/bin/codeagent-wrapper --progress --backend {{BACKEND_PRIMARY}} {{GEMINI_MODEL_FLAG}}{{GROK_MODEL_FLAG}}{{KIMI_MODEL_FLAG}}{{OPENCODE_MODEL_FLAG}}{{PI_MODEL_FLAG}}- \"{{WORKDIR}}\" <<'EOF'\nROLE_FILE: ~/.claude/.ccg/prompts/{{BACKEND_PRIMARY}}/reviewer.md\nReview the uncommitted changes for <task> against the spec constraints. Read callers of every changed function, not only the diff.\nMain candidate: {{WORKDIR}}; inspect `git -C \"{{WORKDIR}}\" diff` and its changed files. With --compare explore, also inspect comparison candidate at <worktree>, base commit <base>: `git -C \"<worktree>\" diff <base>` and its changed files. Report findings separately for each candidate, including candidate name on every finding.\nOUTPUT: JSON with findings per candidate\nEOF",
      run_in_background: true,
      timeout: 300000,
      description: "{{BACKEND_PRIMARY}}: correctness/security review"
@@ -95,7 +95,7 @@ description: 'codex/antigravity 按任务写代码，Claude 监控审查 + 归�
    **SECOND Bash call ({{FRONTEND_PRIMARY}}) — same message**:
    ```
    Bash({
-     command: "~/.claude/bin/codeagent-wrapper --progress --backend {{FRONTEND_PRIMARY}} {{GEMINI_MODEL_FLAG}}{{GROK_MODEL_FLAG}}{{KIMI_MODEL_FLAG}}{{OPENCODE_MODEL_FLAG}}- \"{{WORKDIR}}\" <<'EOF'\nROLE_FILE: ~/.claude/.ccg/prompts/{{FRONTEND_PRIMARY}}/reviewer.md\nIndependently review the uncommitted changes for <task>: logic, integration and security; UI states and accessibility if UI code changed.\nMain candidate: {{WORKDIR}}; inspect `git -C \"{{WORKDIR}}\" diff` and its changed files. With --compare explore, also inspect comparison candidate at <worktree>, base commit <base>: `git -C \"<worktree>\" diff <base>` and its changed files. Report findings separately for each candidate, including candidate name on every finding.\nOUTPUT: JSON with findings per candidate\nEOF",
+     command: "~/.claude/bin/codeagent-wrapper --progress --backend {{FRONTEND_PRIMARY}} {{GEMINI_MODEL_FLAG}}{{GROK_MODEL_FLAG}}{{KIMI_MODEL_FLAG}}{{OPENCODE_MODEL_FLAG}}{{PI_MODEL_FLAG}}- \"{{WORKDIR}}\" <<'EOF'\nROLE_FILE: ~/.claude/.ccg/prompts/{{FRONTEND_PRIMARY}}/reviewer.md\nIndependently review the uncommitted changes for <task>: logic, integration and security; UI states and accessibility if UI code changed.\nMain candidate: {{WORKDIR}}; inspect `git -C \"{{WORKDIR}}\" diff` and its changed files. With --compare explore, also inspect comparison candidate at <worktree>, base commit <base>: `git -C \"<worktree>\" diff <base>` and its changed files. Report findings separately for each candidate, including candidate name on every finding.\nOUTPUT: JSON with findings per candidate\nEOF",
      run_in_background: true,
      timeout: 300000,
      description: "{{FRONTEND_PRIMARY}}: maintainability/patterns review"

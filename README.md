@@ -125,7 +125,7 @@ Manual steps: [AGENTS.md](AGENTS.md).
 
 - **Nothing per turn.** There are no hooks and one small always-on rule (`rules/ccg-codegraph.md`). Skills (`frontend-design`, `scrapling`, `seo-page-builder`, `bt-panel`, `adsense-site-auditor`) load only when called. Output styles keep Claude Code's built-in coding instructions.
 - **One main loop.** Claude plans, decides and talks to you; no router sits in front of it.
-- **Other models only where they earn it:** scoped writing, or a second opinion in a fresh session. Codex-led mode (`node bin/ccg.mjs codex-mode install`) and every wrapper backend (`codex`, `claude`, `gemini`, `antigravity`, `grok`, `kimi`, `opencode`) are kept; DeepSeek Harness as a host is not.
+- **Other models only where they earn it:** scoped writing, or a second opinion in a fresh session. Codex-led mode (`node bin/ccg.mjs codex-mode install`) and every wrapper backend (`codex`, `claude`, `gemini`, `antigravity`, `grok`, `kimi`, `opencode`, `pi`) are kept; Pi uses structured RPC, resumable sessions, and Pi-owned provider/context configuration ([setup](docs/pi-backend.md)); DeepSeek Harness as a host is not.
 
 Design rules: [PRINCIPLES.md](PRINCIPLES.md).
 

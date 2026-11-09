@@ -17,7 +17,7 @@ import { init } from './init'
 import { update } from './update'
 import { manageSkillsMenu } from './skills'
 import { doctor } from './doctor'
-import { promptOpencodeModel } from '../utils/model-selection'
+import { promptOpencodeModel, promptPiModel } from '../utils/model-selection'
 import { isWindows } from '../utils/platform'
 
 const execAsync = promisify(exec)
@@ -503,6 +503,7 @@ async function configModelRouting(): Promise<void> {
   const currentGrokModel = config?.routing?.grokModel || 'grok-4.5'
   const currentKimiModel = config?.routing?.kimiModel || ''
   const currentOpencodeModel = config?.routing?.opencodeModel || ''
+  const currentPiModel = config?.routing?.piModel || ''
 
   console.log(ansis.gray(`  ${i18n.t('init:model.currentRouting')}:`))
   console.log(`  ${ansis.cyan('Frontend:')} ${ansis.green(currentFrontend)}`)
@@ -526,6 +527,7 @@ async function configModelRouting(): Promise<void> {
       { name: 'Kimi', value: 'kimi' },
       { name: 'Codex', value: 'codex' },
       { name: 'OpenCode', value: 'opencode' },
+      { name: 'Pi (RPC)', value: 'pi' },
       { name: `Claude Code ${ansis.cyan(`(${i18n.t('init:model.agentTeams')})`)}`, value: 'claude' },
       { name: `Gemini ${ansis.gray(`(${i18n.t('init:model.deprecated')})`)}`, value: 'gemini' },
     ],
@@ -543,6 +545,7 @@ async function configModelRouting(): Promise<void> {
       { name: 'Kimi', value: 'kimi' },
       { name: 'Antigravity', value: 'antigravity' },
       { name: 'OpenCode', value: 'opencode' },
+      { name: 'Pi (RPC)', value: 'pi' },
       { name: `Claude Code ${ansis.cyan(`(${i18n.t('init:model.agentTeams')})`)}`, value: 'claude' },
       { name: `Gemini ${ansis.gray(`(${i18n.t('init:model.deprecated')})`)}`, value: 'gemini' },
     ],
@@ -612,7 +615,11 @@ async function configModelRouting(): Promise<void> {
   if (selectedFrontend === 'opencode' || selectedBackend === 'opencode') {
     opencodeModel = await promptOpencodeModel(currentOpencodeModel, isZh)
   }
-  if (selectedFrontend === currentFrontend && selectedBackend === currentBackend && geminiModel === currentGeminiModel && grokModel === currentGrokModel && opencodeModel === currentOpencodeModel) {
+  let piModel = currentPiModel
+  if (selectedFrontend === 'pi' || selectedBackend === 'pi') {
+    piModel = await promptPiModel(currentPiModel, isZh)
+  }
+  if (selectedFrontend === currentFrontend && selectedBackend === currentBackend && geminiModel === currentGeminiModel && grokModel === currentGrokModel && opencodeModel === currentOpencodeModel && piModel === currentPiModel) {
     console.log(ansis.gray(`  ${i18n.t('common:configNotModified')}`))
     return
   }
@@ -637,6 +644,7 @@ async function configModelRouting(): Promise<void> {
     config.routing.grokModel = grokModel
     config.routing.kimiModel = currentKimiModel
     config.routing.opencodeModel = opencodeModel
+    config.routing.piModel = piModel
     await writeCcgConfig(config)
   }
 

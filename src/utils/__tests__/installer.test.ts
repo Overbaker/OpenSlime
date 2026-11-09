@@ -20,7 +20,7 @@ vi.mock('node:child_process', async (original) => {
     // Windows uses a runnable Node PE fixture. Verify execution for real, then
     // normalize its identity; this checks installation, not the real Go binary.
     return process.platform === 'win32' && /codeagent-wrapper\.exe" --version$/.test(command)
-      ? Buffer.from('codeagent-wrapper version 5.15.0\n') : output
+      ? Buffer.from('codeagent-wrapper version 5.16.0\n') : output
   }) }
 })
 let assetDirectory: string
@@ -28,7 +28,7 @@ beforeAll(async () => {
   assetDirectory = await fs.mkdtemp(join(tmpdir(), 'ccg-binary-fixture-'))
   fixture.asset = join(assetDirectory, 'wrapper-asset')
   if (process.platform === 'win32') await fs.copy(process.execPath, fixture.asset)
-  else await fs.writeFile(fixture.asset, '#!/usr/bin/env node\nconsole.log("codeagent-wrapper version 5.15.0")\n', { mode: 0o600 })
+  else await fs.writeFile(fixture.asset, '#!/usr/bin/env node\nconsole.log("codeagent-wrapper version 5.16.0")\n', { mode: 0o600 })
   vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new Error('Installer tests must not use live HTTP'))))
 })
 afterAll(async () => { vi.unstubAllGlobals(); await fs.remove(assetDirectory) })
@@ -330,7 +330,7 @@ describe('installWorkflows — prompts installation', () => {
     await fs.remove(tmpDir)
   })
 
-  it('installs codex, gemini, and claude prompts', { timeout: 30_000 }, async () => {
+  it('installs prompts for every supported backend', { timeout: 30_000 }, async () => {
     const result = await installWithFixture(getAllCommandIds(), tmpDir, true, {
       mcpProvider: 'skip',
     })
@@ -353,6 +353,18 @@ describe('installWorkflows — prompts installation', () => {
     const grokFiles = readdirSync(join(promptsDir, 'grok')).filter(f => f.endsWith('.md'))
     expect(grokFiles.length).toBeGreaterThanOrEqual(7)
     expect(grokFiles).toContain('builder.md')
+
+    const piFiles = readdirSync(join(promptsDir, 'pi')).filter(f => f.endsWith('.md'))
+    expect(piFiles.sort()).toEqual([
+      'analyzer.md',
+      'architect.md',
+      'builder.md',
+      'debugger.md',
+      'frontend.md',
+      'optimizer.md',
+      'reviewer.md',
+      'tester.md',
+    ])
   })
 })
 
