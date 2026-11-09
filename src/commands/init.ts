@@ -11,7 +11,7 @@ import { createDefaultConfig, ensureCcgDir, getCcgDir, readCcgConfig, writeCcgCo
 import { configureGeminiCliApi, configureSponsorForCodex, getCoreCommandIds, getSponsor, installAceTool, installAceToolRs, installContextWeaver, installFastContext, installMcpServer, installWorkflows, promptSponsorInit, showBinaryDownloadWarning, sponsorInquirerChoices, syncMcpToCodex, syncMcpToGemini, writeFastContextPrompt } from '../utils/installer'
 import { isWindows } from '../utils/platform'
 import { migrateToV1_4_0, needsMigration } from '../utils/migration'
-import { promptOpencodeModel } from '../utils/model-selection'
+import { promptOpencodeModel, promptPiModel } from '../utils/model-selection'
 import { PACKAGE_ROOT } from '../utils/installer-template'
 import { getSkillCatalog, installedNames, removeSkills, resolveSkillPaths, SKILL_MANIFEST_FILE } from '../utils/skill-manager'
 
@@ -242,6 +242,7 @@ export async function init(options: InitOptions = {}): Promise<void> {
   let grokModel = 'grok-4.5'
   let kimiModel = ''
   let opencodeModel = ''
+  let piModel = ''
   const mode: CollaborationMode = 'smart'
   let selectedWorkflows = getCoreCommandIds()
 
@@ -255,6 +256,7 @@ export async function init(options: InitOptions = {}): Promise<void> {
       grokModel = existingConfig.routing.grokModel || 'grok-4.5'
       kimiModel = existingConfig.routing.kimiModel || ''
       opencodeModel = existingConfig.routing.opencodeModel || ''
+      piModel = existingConfig.routing.piModel || ''
     }
   }
 
@@ -364,6 +366,8 @@ export async function init(options: InitOptions = {}): Promise<void> {
         kimiModel = existingConfig.routing.kimiModel
       if (existingConfig.routing.opencodeModel)
         opencodeModel = existingConfig.routing.opencodeModel
+      if (existingConfig.routing.piModel)
+        piModel = existingConfig.routing.piModel
     }
 
     // ── Step runners (closures sharing outer-scope state) ──
@@ -490,6 +494,7 @@ export async function init(options: InitOptions = {}): Promise<void> {
           { name: 'Kimi', value: 'kimi' as ModelType },
           { name: 'Codex', value: 'codex' as ModelType },
           { name: 'OpenCode', value: 'opencode' as ModelType },
+          { name: 'Pi (RPC)', value: 'pi' as ModelType },
           { name: `Claude Code ${ansis.cyan(`(${i18n.t('init:model.agentTeams')})`)}`, value: 'claude' as ModelType },
           { name: `Gemini ${ansis.gray(`(${i18n.t('init:model.deprecated')})`)}`, value: 'gemini' as ModelType },
           ...navSentinels(canGoBack),
@@ -512,6 +517,7 @@ export async function init(options: InitOptions = {}): Promise<void> {
           { name: 'Kimi', value: 'kimi' as ModelType },
           { name: 'Antigravity', value: 'antigravity' as ModelType },
           { name: 'OpenCode', value: 'opencode' as ModelType },
+          { name: 'Pi (RPC)', value: 'pi' as ModelType },
           { name: `Claude Code ${ansis.cyan(`(${i18n.t('init:model.agentTeams')})`)}`, value: 'claude' as ModelType },
           { name: `Gemini ${ansis.gray(`(${i18n.t('init:model.deprecated')})`)}`, value: 'gemini' as ModelType },
         ],
@@ -523,6 +529,9 @@ export async function init(options: InitOptions = {}): Promise<void> {
 
       if (selectedFrontend === 'opencode' || selectedBackend === 'opencode') {
         opencodeModel = await promptOpencodeModel(opencodeModel, language === 'zh-CN')
+      }
+      if (selectedFrontend === 'pi' || selectedBackend === 'pi') {
+        piModel = await promptPiModel(piModel, language === 'zh-CN')
       }
 
       if (selectedFrontend === 'gemini' || selectedBackend === 'gemini') {
@@ -875,6 +884,9 @@ export async function init(options: InitOptions = {}): Promise<void> {
       if (frontendModels[0] === 'opencode' || backendModels[0] === 'opencode') {
         console.log(`  ${ansis.cyan('OpenCode model:')} ${ansis.gray(opencodeModel || (language === 'zh-CN' ? 'OpenCode 默认' : 'OpenCode default'))}`)
       }
+      if (frontendModels[0] === 'pi' || backendModels[0] === 'pi') {
+        console.log(`  ${ansis.cyan('Pi model:')} ${ansis.gray(piModel || (language === 'zh-CN' ? 'Pi 默认' : 'Pi default'))}`)
+      }
       console.log(`  ${ansis.cyan(i18n.t('init:summary.commandCount'))}  ${ansis.yellow(workflowsCount.toString())}`)
       const mcpSummary = (() => {
         if (mcpProvider === 'fast-context')
@@ -1000,6 +1012,7 @@ export async function init(options: InitOptions = {}): Promise<void> {
     grokModel,
     kimiModel,
     opencodeModel,
+    piModel,
   }
 
   // Summary + confirmation handled by runSummaryStep() inside the state

@@ -205,6 +205,7 @@ var newCommandRunner = func(ctx context.Context, name string, args ...string) co
 type parseResult struct {
 	message  string
 	threadID string
+	err      error
 }
 
 type taskLoggerContextKey struct{}
@@ -832,6 +833,19 @@ func runCodexTaskWithContext(parentCtx context.Context, taskSpec TaskSpec, backe
 	injectedLogger := taskLoggerFromContext(parentCtx)
 	logger := injectedLogger
 
+	// Empty/default follows the established commandContext, codexCommand, and
+	// buildCodexArgsFn test/injection hooks. A non-default task backend must
+	// instead resolve both its executable and argument builder from the registry.
+	if backend == nil && taskSpec.Backend != "" && !strings.EqualFold(strings.TrimSpace(taskSpec.Backend), defaultBackendName) {
+		selected, err := selectBackend(taskSpec.Backend)
+		if err != nil {
+			result.ExitCode = 1
+			result.Error = err.Error()
+			return result
+		}
+		backend = selected
+	}
+
 	cfg := &Config{
 		Mode:          taskSpec.Mode,
 		Task:          taskSpec.Task,
@@ -843,6 +857,7 @@ func runCodexTaskWithContext(parentCtx context.Context, taskSpec TaskSpec, backe
 		GrokModel:     taskSpec.GrokModel,
 		KimiModel:     taskSpec.KimiModel,
 		OpencodeModel: taskSpec.OpencodeModel,
+		PiModel:       taskSpec.PiModel,
 		WithMCP:       taskSpec.WithMCP,
 	}
 
@@ -852,8 +867,6 @@ func runCodexTaskWithContext(parentCtx context.Context, taskSpec TaskSpec, backe
 		commandName = backend.Command()
 		argsBuilder = backend.BuildArgs
 		cfg.Backend = backend.Name()
-	} else if taskSpec.Backend != "" {
-		cfg.Backend = taskSpec.Backend
 	} else if commandName != "" {
 		cfg.Backend = commandName
 	}
@@ -872,6 +885,12 @@ func runCodexTaskWithContext(parentCtx context.Context, taskSpec TaskSpec, backe
 	}
 
 	useStdin := taskSpec.UseStdin
+	rpcBackend := cfg.Backend == "pi"
+	if rpcBackend {
+		// Pi receives both get_state and prompt RPC commands on stdin. Keeping
+		// the prompts out of argv also avoids @file expansion and argv limits.
+		useStdin = true
+	}
 	targetArg := taskSpec.Task
 
 	// Gemini/Antigravity CLI does not support "-" as stdin marker for -p flag.
@@ -1022,7 +1041,7 @@ func runCodexTaskWithContext(parentCtx context.Context, taskSpec TaskSpec, backe
 	//   API keys are already protected via cmd.SetEnv() from loadMinimalEnvSettings().
 	//   Project dir is also passed via --include-directories in buildGeminiArgs().
 	// - Claude: uses cmd.Dir as project context (no .env loading issue).
-	if cfg.Mode != "resume" && cfg.WorkDir != "" {
+	if cfg.WorkDir != "" && (cfg.Mode != "resume" || rpcBackend) {
 		switch commandName {
 		case "codex":
 			// Codex uses -C flag, don't set cmd.Dir
@@ -1059,6 +1078,41 @@ func runCodexTaskWithContext(parentCtx context.Context, taskSpec TaskSpec, backe
 			result.Error = attachStderr("failed to create stdin pipe: " + err.Error())
 			return result
 		}
+	}
+
+	var stdinWriteDone chan struct{}
+	var stdinWriteError error
+	var rpcInputCompleted bool
+	var rpcInputError error
+	if rpcBackend {
+		stdinWriteDone = make(chan struct{})
+	}
+
+	var stdinCloseOnce sync.Once
+	closeStdin := func() {
+		stdinCloseOnce.Do(func() {
+			if stdinPipe != nil {
+				_ = stdinPipe.Close()
+			}
+		})
+	}
+	defer closeStdin()
+
+	// RPC settlement and the stdin JSON encode happen independently. Wait for
+	// the complete request before closing stdin or publishing the parsed result.
+	// Cancellation still closes immediately through closeStdin to unblock writes.
+	closeRPCStdinAfterWrite := func() {
+		if stdinWriteDone == nil {
+			closeStdin()
+			return
+		}
+		select {
+		case <-stdinWriteDone:
+			rpcInputCompleted = true
+			rpcInputError = stdinWriteError
+		case <-ctx.Done():
+		}
+		closeStdin()
 	}
 
 	stdout, err := cmd.StdoutPipe()
@@ -1156,6 +1210,35 @@ func runCodexTaskWithContext(parentCtx context.Context, taskSpec TaskSpec, backe
 			return
 		}
 
+		if rpcBackend {
+			parsed := parsePiRPCStream(stdoutReader, logWarnFn, logInfoFn, piStreamCallbacks{
+				onMessage: func() {
+					select {
+					case messageSeen <- struct{}{}:
+					default:
+					}
+				},
+				onComplete: func() {
+					select {
+					case completeSeen <- struct{}{}:
+					default:
+					}
+					closeRPCStdinAfterWrite()
+					if globalWebServer != nil && webSessionID != "" {
+						globalWebServer.EndSession(webSessionID, cfg.Backend)
+					}
+				},
+				onContent:        onContentCallback,
+				onProgress:       onProgressCallback,
+				onSessionStarted: onSessionStartedCallback,
+			})
+			// agent_settled has already signalled completion above. Signalling
+			// again here can start the forced-stop timer before this result is
+			// collected when the operation has a short timeout.
+			parseCh <- parsed
+			return
+		}
+
 		msg, tid := parseJSONStreamInternalWithContent(stdoutReader, logWarnFn, logInfoFn, func() {
 			select {
 			case messageSeen <- struct{}{}:
@@ -1202,10 +1285,32 @@ func runCodexTaskWithContext(parentCtx context.Context, taskSpec TaskSpec, backe
 	if useStdin && stdinPipe != nil {
 		logInfoFn(fmt.Sprintf("Writing %d chars to stdin...", len(taskSpec.Task)))
 		go func(data string) {
-			defer stdinPipe.Close()
+			if rpcBackend {
+				defer close(stdinWriteDone)
+				input, marshalErr := buildPiRPCInput(data)
+				if marshalErr != nil {
+					stdinWriteError = marshalErr
+					logErrorFn("Failed to encode Pi RPC prompt: " + marshalErr.Error())
+					closeStdin()
+					return
+				}
+				if _, writeErr := io.WriteString(stdinPipe, input); writeErr != nil {
+					stdinWriteError = writeErr
+					logWarnFn("Failed to write Pi RPC prompt: " + writeErr.Error())
+					closeStdin()
+				}
+				// Unlike one-shot CLIs, Pi RPC stays alive until the assistant
+				// settles. The parser closes stdin from onComplete.
+				return
+			}
+			defer closeStdin()
 			_, _ = io.WriteString(stdinPipe, data)
 		}(taskSpec.Task)
-		logInfoFn("Stdin closed")
+		if rpcBackend {
+			logInfoFn("Pi RPC commands written; stdin remains open until agent_settled")
+		} else {
+			logInfoFn("Stdin closed")
+		}
 	}
 
 	waitCh := make(chan error, 1)
@@ -1314,7 +1419,11 @@ waitLoop:
 		closeWithReason(stdout, stdoutCloseReasonCtx)
 		parsed = <-parseCh
 	case messageSeenObserved || completeSeenObserved:
-		closeWithReason(stdout, stdoutCloseReasonWait)
+		// RPC stdout is an event stream, not a free-form text pipe. Let Pi
+		// consume agent_settled and EOF before closing its transport.
+		if !rpcBackend {
+			closeWithReason(stdout, stdoutCloseReasonWait)
+		}
 		parsed = <-parseCh
 	default:
 		drainTimer := time.NewTimer(stdoutDrainTimeout)
@@ -1325,16 +1434,26 @@ waitLoop:
 			closeWithReason(stdout, stdoutCloseReasonWait)
 		case <-messageSeen:
 			messageSeenObserved = true
-			closeWithReason(stdout, stdoutCloseReasonWait)
+			if !rpcBackend {
+				closeWithReason(stdout, stdoutCloseReasonWait)
+			}
 			parsed = <-parseCh
 		case <-completeSeen:
 			completeSeenObserved = true
-			closeWithReason(stdout, stdoutCloseReasonWait)
+			if !rpcBackend {
+				closeWithReason(stdout, stdoutCloseReasonWait)
+			}
 			parsed = <-parseCh
 		case <-drainTimer.C:
 			closeWithReason(stdout, stdoutCloseReasonDrain)
 			parsed = <-parseCh
 		}
+	}
+
+	// onComplete publishes these values before parseCh is sent. A successful
+	// assistant message must not conceal an incomplete RPC request.
+	if rpcBackend && rpcInputCompleted && rpcInputError != nil && parsed.err == nil {
+		parsed.err = fmt.Errorf("write Pi RPC stdin: %w", rpcInputError)
 	}
 
 	if ctxErr := ctx.Err(); ctxErr != nil {
@@ -1345,6 +1464,13 @@ waitLoop:
 		}
 		result.ExitCode = 130
 		result.Error = attachStderr("execution cancelled")
+		return result
+	}
+
+	if parsed.err != nil {
+		logErrorFn(parsed.err.Error())
+		result.ExitCode = 1
+		result.Error = attachStderr(parsed.err.Error())
 		return result
 	}
 

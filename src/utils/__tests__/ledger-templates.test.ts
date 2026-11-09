@@ -44,7 +44,7 @@ describe('installed ledger prompts', () => {
   it('installs osm-ledger.md next to osm-report.md with ~/.claude rewritten', async () => {
     const installDir = join(tmpdir(), `osm-tpl-${Date.now()}`, '.claude')
     await fs.ensureDir(join(installDir, 'bin'))
-    await fs.writeFile(join(installDir, 'bin', 'codeagent-wrapper'), '#!/usr/bin/env node\nconsole.log("codeagent-wrapper version 5.15.0")\n', { mode: 0o755 })
+    await fs.writeFile(join(installDir, 'bin', 'codeagent-wrapper'), '#!/usr/bin/env node\nconsole.log("codeagent-wrapper version 5.16.0")\n', { mode: 0o755 })
     await installWorkflows(getAllCommandIds(), installDir, true, { mcpProvider: 'skip' })
     const installed = readFileSync(join(installDir, '.ccg', 'prompts', 'claude', 'osm-ledger.md'), 'utf8')
     expect(installed).toContain(`${installDir}/bin/osm ledger lessons query`)

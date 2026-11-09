@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	version               = "5.15.0"
+	version               = "5.16.0"
 	defaultWorkdir        = "."
 	defaultTimeout        = 7200 // seconds (2 hours)
 	defaultCoverageTarget = 90.0
@@ -233,7 +233,7 @@ func run() (exitCode int) {
 				case arg == "--with-mcp":
 					withMCPInParallel = true
 					continue
-				case arg == "--gemini-model", arg == "--grok-model", arg == "--kimi-model", arg == "--opencode-model":
+				case arg == "--gemini-model", arg == "--grok-model", arg == "--kimi-model", arg == "--opencode-model", arg == "--pi-model":
 					// Bare form carries its value in the next arg — consume it too,
 					// otherwise the value lands in extras and hard-fails the run.
 					geminiModelInParallel = true
@@ -241,7 +241,7 @@ func run() (exitCode int) {
 						i++
 					}
 					continue
-				case strings.HasPrefix(arg, "--gemini-model="), strings.HasPrefix(arg, "--grok-model="), strings.HasPrefix(arg, "--kimi-model="), strings.HasPrefix(arg, "--opencode-model="):
+				case strings.HasPrefix(arg, "--gemini-model="), strings.HasPrefix(arg, "--grok-model="), strings.HasPrefix(arg, "--kimi-model="), strings.HasPrefix(arg, "--opencode-model="), strings.HasPrefix(arg, "--pi-model="):
 					geminiModelInParallel = true
 					continue
 				default:
@@ -251,7 +251,7 @@ func run() (exitCode int) {
 
 			// Warn about unsupported parameter
 			if geminiModelInParallel {
-				logWarn("--gemini-model/--grok-model parameters are not supported in parallel mode")
+				logWarn("backend-specific model parameters are not supported in parallel mode")
 			}
 
 			if len(extras) > 0 {
@@ -399,6 +399,12 @@ func run() (exitCode int) {
 	if cfg.GrokModel != "" && cfg.Backend != "grok" {
 		logWarn("--grok-model parameter is only effective with --backend grok")
 	}
+	if cfg.PiModel != "" && cfg.Backend == "pi" {
+		logInfo(fmt.Sprintf("Using Pi model: %s", cfg.PiModel))
+	}
+	if cfg.PiModel != "" && cfg.Backend != "pi" {
+		logWarn("--pi-model parameter is only effective with --backend pi")
+	}
 
 	timeoutSec := resolveTimeout()
 	logInfo(fmt.Sprintf("Timeout: %ds", timeoutSec))
@@ -514,10 +520,22 @@ func run() (exitCode int) {
 		GrokModel:     cfg.GrokModel,
 		KimiModel:     cfg.KimiModel,
 		OpencodeModel: cfg.OpencodeModel,
+		PiModel:       cfg.PiModel,
 		WithMCP:       cfg.WithMCP,
 	}
 
-	result := runTaskFn(taskSpec, false, cfg.Timeout)
+	selectedTaskRunner := runTaskFn
+	if backend.Name() != defaultBackendName && reflect.ValueOf(runTaskFn).Pointer() == reflect.ValueOf(runCodexTask).Pointer() {
+		// The default runner resolves task-specific backends in its executor path.
+		// Preserve a selected non-default backend for a single run, including test
+		// backends supplied through selectBackendFn. The default backend continues
+		// through runTaskFn and its established command/argument injection hooks.
+		// Custom runTaskFn hooks retain their signature and take precedence unchanged.
+		selectedTaskRunner = func(spec TaskSpec, silent bool, timeout int) TaskResult {
+			return runCodexTaskWithContext(nil, spec, backend, nil, false, silent, timeout)
+		}
+	}
+	result := selectedTaskRunner(taskSpec, false, cfg.Timeout)
 
 	if result.ExitCode != 0 {
 		return result.ExitCode
@@ -604,7 +622,8 @@ Parallel mode examples:
 
 Options:
     --lite, -L            Lite mode: disable Web UI, faster response
-    --backend <name>      Select backend (codex, gemini, claude)
+    --backend <name>      Select backend (codex, gemini, claude, antigravity, grok, kimi, opencode, pi)
+    --pi-model <name>     Specify Pi provider/model or unique model ID (or PI_MODEL)
     --gemini-model <name> Specify Gemini model (gemini backend only)
                           Can also be set via GEMINI_MODEL environment variable
                           CLI parameter takes precedence over environment variable
@@ -615,6 +634,8 @@ Environment Variables:
     CODEX_TIMEOUT              Timeout in milliseconds (default: 7200000)
     CODEX_REQUIRE_APPROVAL     Require manual approval for file operations (default: false)
     CODEX_DISABLE_SKIP_GIT_CHECK  Disable skip-git-repo-check flag (default: false)
+    PI_MODEL                   Pi provider/model or unique model ID (--pi-model overrides)
+    CODEAGENT_PI_COMMAND       Override Pi executable (default: pi)
     CODEAGENT_ASCII_MODE       Use ASCII symbols instead of Unicode (PASS/WARN/FAIL)
     CODEAGENT_LITE_MODE        Enable lite mode (true/false)
 

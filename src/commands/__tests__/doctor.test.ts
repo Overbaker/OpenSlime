@@ -213,10 +213,10 @@ describe('CCG doctor inventory', () => {
   })
 
   it('uses platform-specific Windows npm shims and native executables', async () => {
-    await config('antigravity', 'codex', ['gemini', 'claude', 'kimi', 'grok', 'opencode'])
+    await config('antigravity', 'codex', ['gemini', 'claude', 'kimi', 'grok', 'opencode', 'pi'])
     await claudeInstall()
     await collectDoctorReport(deps({ platform: 'win32' }))
-    expect(exec.mock.calls.map(call => call[0])).toEqual(['agy.exe', 'claude.exe', 'codex.cmd', 'gemini.cmd', 'grok.exe', 'kimi.exe', 'opencode.exe'])
+    expect(exec.mock.calls.map(call => call[0])).toEqual(['agy.exe', 'claude.exe', 'codex.cmd', 'gemini.cmd', 'grok.exe', 'kimi.exe', 'opencode.exe', 'pi.exe'])
     expect(exec.mock.calls.every(call => JSON.stringify(call[1]) === '["--version"]')).toBe(true)
   })
 

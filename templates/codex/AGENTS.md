@@ -127,7 +127,7 @@ ls .ccg/spec/ 2>/dev/null
 ### ⛔ 默认调用方式：双模型并行（M+ 复杂度必须用这个）
 
 ```bash
-~/.claude/bin/codeagent-wrapper --progress --backend {{FRONTEND_PRIMARY}} - "$(pwd)" <<'FRONTEND_EOF'
+~/.claude/bin/codeagent-wrapper --progress --backend {{FRONTEND_PRIMARY}} {{PI_MODEL_FLAG}}- "$(pwd)" <<'FRONTEND_EOF'
 ROLE_FILE: ~/.claude/.ccg/prompts/{{FRONTEND_PRIMARY}}/$ROLE.md
 <TASK>
 {任务描述 + 上下文}
@@ -152,7 +152,7 @@ wait
 
 #### {{FRONTEND_PRIMARY}}（前端/UI 分析）
 ```bash
-~/.claude/bin/codeagent-wrapper --progress --backend {{FRONTEND_PRIMARY}} - "$(pwd)" <<'EOF'
+~/.claude/bin/codeagent-wrapper --progress --backend {{FRONTEND_PRIMARY}} {{PI_MODEL_FLAG}}- "$(pwd)" <<'EOF'
 ROLE_FILE: ~/.claude/.ccg/prompts/{{FRONTEND_PRIMARY}}/$ROLE.md
 <TASK>
 {任务描述 + 上下文}
@@ -287,7 +287,7 @@ Critical 问题 → spawn 修复代理。Warning → 视情况修复。
 
 ```bash
 # 必须并行调用两个模型审查 git diff
-~/.claude/bin/codeagent-wrapper --progress --backend {{FRONTEND_PRIMARY}} - "$(pwd)" <<'EOF'
+~/.claude/bin/codeagent-wrapper --progress --backend {{FRONTEND_PRIMARY}} {{PI_MODEL_FLAG}}- "$(pwd)" <<'EOF'
 ROLE_FILE: ~/.claude/.ccg/prompts/{{FRONTEND_PRIMARY}}/reviewer.md
 <TASK>审查以下代码变更：$(git diff)</TASK>
 OUTPUT: Critical/Warning/Info 分级审查报告

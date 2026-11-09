@@ -24,6 +24,7 @@ type Config struct {
 	GrokModel          string // Grok model name (empty = use default)
 	KimiModel          string // Kimi model alias (empty = use default)
 	OpencodeModel      string // Opencode model as provider/model (empty = use default)
+	PiModel            string // Pi model as provider/model or unique model ID (empty = use default)
 	Progress           bool   // Emit compact progress lines to stderr
 	WithMCP            bool   // Let the sub-agent load Claude's MCP servers (slow; off by default)
 }
@@ -49,6 +50,7 @@ type TaskSpec struct {
 	GrokModel     string          `json:"-"`
 	KimiModel     string          `json:"-"`
 	OpencodeModel string          `json:"-"`
+	PiModel       string          `json:"-"`
 	WithMCP       bool            `json:"-"`
 	Context       context.Context `json:"-"`
 }
@@ -81,6 +83,7 @@ var backendRegistry = map[string]Backend{
 	"grok":        GrokBackend{},
 	"kimi":        KimiBackend{},
 	"opencode":    OpencodeBackend{},
+	"pi":          PiBackend{},
 }
 
 func selectBackend(name string) (Backend, error) {
@@ -219,6 +222,7 @@ func parseArgs() (*Config, error) {
 	grokModel := strings.TrimSpace(os.Getenv("GROK_MODEL"))
 	kimiModel := strings.TrimSpace(os.Getenv("KIMI_MODEL"))
 	opencodeModel := strings.TrimSpace(os.Getenv("OPENCODE_MODEL"))
+	piModel := strings.TrimSpace(os.Getenv("PI_MODEL"))
 	withMCP := envFlagEnabled("CODEAGENT_WITH_MCP")
 
 	backendName := defaultBackendName
@@ -310,6 +314,24 @@ func parseArgs() (*Config, error) {
 			}
 			opencodeModel = value
 			continue
+		case arg == "--pi-model":
+			if i+1 >= len(args) {
+				return nil, fmt.Errorf("--pi-model flag requires a non-empty model name")
+			}
+			value := strings.TrimSpace(args[i+1])
+			if value == "" {
+				return nil, fmt.Errorf("--pi-model flag requires a non-empty model name")
+			}
+			piModel = value
+			i++
+			continue
+		case strings.HasPrefix(arg, "--pi-model="):
+			value := strings.TrimSpace(strings.TrimPrefix(arg, "--pi-model="))
+			if value == "" {
+				return nil, fmt.Errorf("--pi-model flag requires a non-empty model name")
+			}
+			piModel = value
+			continue
 		case arg == "--with-mcp":
 			withMCP = true
 			continue
@@ -341,7 +363,11 @@ func parseArgs() (*Config, error) {
 	}
 	args = filtered
 
-	cfg := &Config{WorkDir: defaultWorkdir, Backend: backendName, SkipPermissions: skipPermissions, GeminiModel: geminiModel, GrokModel: grokModel, KimiModel: kimiModel, OpencodeModel: opencodeModel, Progress: progress, WithMCP: withMCP}
+	if backendName == "pi" && strings.HasPrefix(piModel, "-") {
+		return nil, fmt.Errorf("--pi-model requires a model name that does not start with '-'")
+	}
+
+	cfg := &Config{WorkDir: defaultWorkdir, Backend: backendName, SkipPermissions: skipPermissions, GeminiModel: geminiModel, GrokModel: grokModel, KimiModel: kimiModel, OpencodeModel: opencodeModel, PiModel: piModel, Progress: progress, WithMCP: withMCP}
 	cfg.MaxParallelWorkers = resolveMaxParallelWorkers()
 
 	if args[0] == "resume" {

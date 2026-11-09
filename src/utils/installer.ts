@@ -92,7 +92,7 @@ export type { SkillMeta } from './skill-registry'
  * Must match the `version` constant in codeagent-wrapper/main.go.
  * When this differs from the installed binary, update triggers re-download.
  */
-const EXPECTED_BINARY_VERSION = '5.15.0'
+const EXPECTED_BINARY_VERSION = '5.16.0'
 
 // ═══════════════════════════════════════════════════════
 // Install context — shared across sub-functions
@@ -108,6 +108,7 @@ interface InstallConfig {
     grokModel?: string
     kimiModel?: string
     opencodeModel?: string
+    piModel?: string
   }
   mcpProvider: string
   skillsProfile?: string[]
@@ -309,7 +310,7 @@ async function installPromptFiles(ctx: InstallContext): Promise<void> {
     return
   }
 
-  for (const model of ['codex', 'gemini', 'claude', 'antigravity', 'grok', 'kimi', 'opencode']) {
+  for (const model of ['codex', 'gemini', 'claude', 'antigravity', 'grok', 'kimi', 'opencode', 'pi']) {
     try {
       const installed = await copyMdTemplates(
         ctx,
@@ -1013,6 +1014,7 @@ export async function installWorkflows(
       grokModel?: string
       kimiModel?: string
       opencodeModel?: string
+      piModel?: string
     }
     mcpProvider?: string
     skillsProfile?: string[]
