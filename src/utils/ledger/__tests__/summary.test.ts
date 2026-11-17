@@ -32,6 +32,17 @@ describe('contribution verdicts', () => {
     const failing = [...Array.from({ length: 5 }, () => stage(70, [inv('x', 3, 0)])), stage(70, [inv('x', null, null, 'failed')]), stage(70, [inv('x', null, null, 'failed')])]
     expect(summarize(failing).participants.backend[0]).toMatchObject({ failure_rate: 0.2857, verdict: 'revisit' })
   })
+
+  it('counts reported failure reasons per participant and shows them on the line', () => {
+    const s = summarize([
+      stage(70, [{ ...inv('agy', null, null, 'failed'), failure: 'timeout' }]),
+      stage(70, [{ ...inv('agy', null, null, 'failed'), failure: 'timeout' }]),
+      stage(70, [{ ...inv('agy', null, null, 'skipped'), failure: 'quota' }]),
+      stage(70, [inv('agy', null, null, 'failed')]),
+    ])
+    expect(s.participants.backend[0].failures).toEqual({ quota: 1, timeout: 2 })
+    expect(summaryLines('t', s, 0).join('\n')).toContain('failed 3/3 · skipped 1 (quota 1, timeout 2)')
+  })
 })
 
 describe('review fixes: orchestrator', () => {

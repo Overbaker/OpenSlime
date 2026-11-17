@@ -88,6 +88,7 @@ description: '需求 → 约束集（codex + antigravity 交叉探索 + OpenSpec
      * **Risks**: Blockers needing mitigation
 
 6. **User Interaction for Ambiguity Resolution**
+   - Before offering options, restate the goal in one line and confirm it with the user if the request left it open. In the ledger, users often answered research questions with "Other" or restated the goal, which means the options missed what they wanted.
    - Compile prioritized list of open questions.
    - Use `AskUserQuestion` tool to present systematically:
      * Group related questions

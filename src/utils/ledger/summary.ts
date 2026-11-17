@@ -18,6 +18,8 @@ export interface ParticipantGroup {
   failed: number
   skipped: number
   failure_rate: number | null
+  /** Reported reasons for failed or skipped calls; absent reasons are not counted. */
+  failures: Record<string, number>
   runs: number
   verdict: Verdict
   non_additive: boolean
@@ -102,12 +104,13 @@ interface Acc {
   succeeded: number
   failed: number
   skipped: number
+  failures: Record<string, number>
   runs: Set<string>
   nonAdditive: boolean
 }
 
 function emptyAcc(): Acc {
-  return { invoked: 0, accepted: 0, rejected: 0, unadjudicated: 0, succeeded: 0, failed: 0, skipped: 0, runs: new Set(), nonAdditive: false }
+  return { invoked: 0, accepted: 0, rejected: 0, unadjudicated: 0, succeeded: 0, failed: 0, skipped: 0, failures: {}, runs: new Set(), nonAdditive: false }
 }
 
 function verdict(adjudicated: number, runs: number, contribution: number | null, failureRate: number | null): Verdict {
@@ -131,6 +134,7 @@ function toGroup(name: string, a: Acc): ParticipantGroup {
     failed: a.failed,
     skipped: a.skipped,
     failure_rate: failure,
+    failures: Object.fromEntries(Object.entries(a.failures).sort(([x], [y]) => byCodePoint(x, y))),
     runs: a.runs.size,
     verdict: verdict(adjudicated, a.runs.size, contribution, failure),
     non_additive: a.nonAdditive,
@@ -152,6 +156,7 @@ function participants(stageEvents: LedgerEvent[]): Summary['participants'] {
         a.rejected += inv.rejected ?? 0
         a.unadjudicated += inv.unadjudicated ?? 0
         a[inv.status]++
+        if (inv.failure) a.failures[inv.failure] = (a.failures[inv.failure] ?? 0) + 1
         if ((inv.accepted ?? 0) + (inv.rejected ?? 0) > 0) a.runs.add(e.run_id)
         if (kind === 'skill' && inv.skills.length > 1) a.nonAdditive = true
       }

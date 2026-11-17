@@ -8,7 +8,7 @@ import { getAllCommandIds, installWorkflows } from '../installer'
 import { PACKAGE_ROOT } from '../installer-template'
 import { PRACTICES } from '../ledger/dimensions'
 import { PARAMS } from '../ledger/params'
-import { CHANGE_KINDS, DIMENSIONS } from '../ledger/schema'
+import { CHANGE_KINDS, DIMENSIONS, INVOCATION_FAILURES } from '../ledger/schema'
 import { recommendedIndex } from '../ledger/store'
 
 const read = (rel: string) => readFileSync(join(PACKAGE_ROOT, 'templates', rel), 'utf8')
@@ -61,6 +61,7 @@ describe('Q18: report template budget and vocabularies', () => {
     expect([...dims.matchAll(/`([a-z]+)`/g)].map(m => m[1]).concat('adoption').sort()).toEqual([...DIMENSIONS].sort())
     expect(report.match(/`practices` from `([^`]+)`/)![1].split(', ')).toEqual([...PRACTICES])
     for (const t of [report, ledger]) expect(t.match(/`(feature \| fix[^`]*)`/)![1].split(' | ')).toEqual([...CHANGE_KINDS])
+    expect(report.match(/`failure` `([^`]+)`/)![1].split(' | ')).toEqual([...INVOCATION_FAILURES])
   })
 
   it('every JSON example appends with exit 0 through the CLI', () => {

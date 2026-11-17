@@ -30,7 +30,11 @@ export interface Invocation {
   mcp_tools?: string[]
   practices?: string[]
   cost?: Cost
+  failure?: InvocationFailure
 }
+
+export const INVOCATION_FAILURES = ['timeout', 'quota', 'auth', 'region', 'crash', 'empty-output', 'bad-output', 'other'] as const
+export type InvocationFailure = typeof INVOCATION_FAILURES[number]
 
 export interface ProbeCandidate {
   label: 'A' | 'B'
@@ -226,7 +230,7 @@ function stageCompleted(p: unknown, path: string): Obj {
   c.band = confidenceBand(percent)
   nullable(o.verify, `${path}.verify`, (v, q) => oneOf(v, q, ['passed', 'failed', 'not_run']))
   arr(o.invocations, `${path}.invocations`, (v, q) => {
-    const inv = obj(v, q, ['backend', 'role', 'skills', 'status', 'accepted', 'rejected', 'unadjudicated'], ['model', 'mcp_tools', 'practices', 'cost'])
+    const inv = obj(v, q, ['backend', 'role', 'skills', 'status', 'accepted', 'rejected', 'unadjudicated'], ['model', 'mcp_tools', 'practices', 'cost', 'failure'])
     slug(inv.backend, `${q}.backend`)
     slug(inv.role, `${q}.role`)
     arr(inv.skills, `${q}.skills`, id)
@@ -240,6 +244,10 @@ function stageCompleted(p: unknown, path: string): Obj {
     })
     optional(inv, 'practices', q, (x, r) => unique(arr(x, r, (y, t) => slug(y, t, 40), 0, 10), r))
     optional(inv, 'cost', q, cost)
+    optional(inv, 'failure', q, (x, r) => {
+      if (inv.status === 'succeeded') fail(r, 'only for a failed or skipped invocation')
+      oneOf(x, r, INVOCATION_FAILURES)
+    })
     return inv
   })
   optional(o, 'ai_decisions', path, aiDecisions)

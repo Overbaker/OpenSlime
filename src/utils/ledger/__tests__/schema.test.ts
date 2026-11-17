@@ -234,6 +234,20 @@ describe('ledger dimensions: optional v1 fields', () => {
     expect(() => validateInput(edge)).not.toThrow()
   })
 
+  it('accepts a failure reason only on a failed or skipped invocation', () => {
+    const e = full()
+    Object.assign(e.payload.invocations[0], { status: 'failed', failure: 'timeout' })
+    expect(() => validateInput(e)).not.toThrow()
+    e.payload.invocations[0].status = 'skipped'
+    expect(() => validateInput(e)).not.toThrow()
+    e.payload.invocations[0].failure = 'flaky'
+    rejects(e, /failure: expected one of/)
+    Object.assign(e.payload.invocations[0], { status: 'succeeded', failure: 'timeout' })
+    rejects(e, /failure: only for a failed or skipped invocation/)
+    e.payload.invocations[0].failure = null
+    expect(() => validateInput(e)).not.toThrow()
+  })
+
   it('Q6: unknown dimension, ai_decisions key, change_kind or position exits 2 and lists the allowed values', () => {
     rejects(decisionEvent({ payload: { ...decisionEvent().payload, dimension: 'budget' } }), new RegExp(`dimension: expected one of ${DIMENSIONS.join('\\|')}`))
     const rand = mulberry32(13)

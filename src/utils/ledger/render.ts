@@ -65,7 +65,7 @@ function pct(x: number | null): string {
 function groupLine(g: ParticipantGroup): string {
   const contrib = g.contribution === null ? 'unknown' : `${g.accepted}/${g.adjudicated} ${pct(g.contribution)}`
   const verdict = g.verdict === 'insufficient' ? `insufficient (n=${g.adjudicated}, runs=${g.runs})` : `${g.verdict} (n=${g.adjudicated})`
-  return `  ${g.name}  invoked ${g.invoked} · contribution ${contrib} · failed ${g.failed}/${g.succeeded + g.failed}${g.skipped ? ` · skipped ${g.skipped}` : ''}${g.non_additive ? ' · non-additive' : ''} · ${verdict}`
+  return `  ${g.name}  invoked ${g.invoked} · contribution ${contrib} · failed ${g.failed}/${g.succeeded + g.failed}${g.skipped ? ` · skipped ${g.skipped}` : ''}${Object.keys(g.failures).length ? ` (${Object.entries(g.failures).map(([k, n]) => `${k} ${n}`).join(', ')})` : ''}${g.non_additive ? ' · non-additive' : ''} · ${verdict}`
 }
 
 export function summaryLines(title: string, s: Summary, invalid: number): string[] {
