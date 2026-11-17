@@ -29,6 +29,8 @@ description: 'codex + antigravity 独立会话交叉审查 → Critical 必须�
    - Always run both {{BACKEND_PRIMARY}} and {{FRONTEND_PRIMARY}}, launched in ONE message with `run_in_background: true`. They answer independently; Claude cross-checks where they agree and disagree.
    - **工作目录**：`{{WORKDIR}}` **必须通过 Bash 执行 `pwd`（Unix）或 `cd`（Windows CMD）获取当前工作目录的绝对路径**，禁止从 `$HOME` 或环境变量推断。如果用户通过 `/add-dir` 添加了多个工作区，先确定任务相关的工作区。
 
+   - **HAPI session dispatch**: When `mcp__hapi__spawn_peer` is in your tool list (and `$ARGUMENTS` lacks `--no-hapi-mcp`), read `~/.claude/.ccg/prompts/claude/hapi-mcp.md` once and dispatch both fresh reviewers via `mcp__hapi__spawn_peer` (`waitForReply: true`) instead of `codeagent-wrapper` so review sessions link to the parent session.
+
    **Step 3.1**: Launch the calls below in ONE message:
 
    **FIRST Bash call ({{BACKEND_PRIMARY}})**:

@@ -50,6 +50,8 @@ description: 'codex/antigravity 按任务写代码，Claude 监控审查 + 归�
 
    **工作目录**：`{{WORKDIR}}` **必须通过 Bash 执行 `pwd`（Unix）或 `cd`（Windows CMD）获取当前工作目录的绝对路径**，禁止从 `$HOME` 或环境变量推断。如果用户通过 `/add-dir` 添加了多个工作区，先确定任务相关的工作区。
 
+   - **HAPI session dispatch**: When `mcp__hapi__spawn_peer` is in your tool list (and `$ARGUMENTS` lacks `--no-hapi-mcp`), read `~/.claude/.ccg/prompts/claude/hapi-mcp.md` once and dispatch/resume writers via `mcp__hapi__spawn_peer` / `mcp__hapi__ping_peer` (`waitForReply: true`) instead of `codeagent-wrapper` so workers run as linked HAPI sessions.
+
    For each task (independent tasks with disjoint files may go in one `--parallel` batch; use `dependencies:` for ordering):
    ```
    ~/.claude/bin/codeagent-wrapper --progress --backend <{{BACKEND_PRIMARY}}|{{FRONTEND_PRIMARY}}> {{GEMINI_MODEL_FLAG}}{{GROK_MODEL_FLAG}}{{KIMI_MODEL_FLAG}}{{OPENCODE_MODEL_FLAG}}- "{{WORKDIR}}" <<'EOF'
@@ -79,6 +81,8 @@ description: 'codex/antigravity 按任务写代码，Claude 监控审查 + 归�
 
    - **Lesson probe** (see osm-ledger.md): do not use the two prompts below. Use the neutral A/B prompts in osm-ledger.md step 5: no workdir, and none of the words main or comparison. Hold Step 5 fixes until the probe is scored. On a tie the main side lands.
    - With `--compare explore`, wait for both writers, then substitute the recorded absolute comparison worktree path and base commit into BOTH reviewer prompts below. Both reviewers must inspect both candidates before selection; without comparison, omit the comparison candidate instructions.
+
+   - **HAPI session dispatch**: When `mcp__hapi__spawn_peer` is in your tool list (and `$ARGUMENTS` lacks `--no-hapi-mcp`), use `mcp__hapi__spawn_peer` (`waitForReply: true`, see `~/.claude/.ccg/prompts/claude/hapi-mcp.md`) instead of `codeagent-wrapper`.
 
    **Step 6.1**: Launch the calls below in ONE message:
 

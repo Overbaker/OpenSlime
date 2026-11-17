@@ -87,6 +87,7 @@ Manual steps: [AGENTS.md](AGENTS.md).
 - **Scoped writers.** In `/osm:impl`, `codex` writes backend, logic and tests, and `antigravity` writes UI. Each task lists the files its writer may touch.
 - **Claude supervises.** It fixes behaviour-preserving slips of &le;5 lines itself and re-runs `VERIFY`. Anything bigger goes back to the writer via `resume`; after two failed tries it asks you before taking over.
 - **Always cross-checked.** Research, plan and review run codex and antigravity in separate fresh sessions, and Claude compares where they agree and where they don't.
+- **HAPI peer dispatch.** Inside a HAPI session with `mcp__hapi__spawn_peer`, `/osm:*` automatically dispatches workers via HAPI MCP (`waitForReply: true`, mapping `antigravity` to `agy`) so subagent chats appear as linked child sessions; `--no-hapi-mcp` or running outside HAPI falls back to `codeagent-wrapper`.
 - **Stage report.** Every run ends with a report in `${TMPDIR:-/tmp}/osm-reports/` that includes a confidence estimate (High/Medium/Low, %).
 
 ## Ledger reference

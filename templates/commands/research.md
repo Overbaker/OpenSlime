@@ -52,6 +52,8 @@ description: '需求 → 约束集（codex + antigravity 交叉探索 + OpenSpec
    }
    ```
 
+   - **HAPI session dispatch**: When `mcp__hapi__spawn_peer` is in your tool list (and `$ARGUMENTS` lacks `--no-hapi-mcp`), read `~/.claude/.ccg/prompts/claude/hapi-mcp.md` once and dispatch both models via `mcp__hapi__spawn_peer` (`waitForReply: true`) instead of `codeagent-wrapper` so workers run as linked HAPI sessions.
+
    **Step 4.1**: Launch the calls below in ONE message:
 
    **FIRST Bash call ({{BACKEND_PRIMARY}} — backend boundaries)**:

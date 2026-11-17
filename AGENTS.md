@@ -7,7 +7,7 @@ Install OpenSlime to provide minimal Claude-led multi-agent collaboration on Ope
 What the installation writes:
 - `~/.claude/commands/osm/` (slash commands)
 - `~/.claude/skills/ccg/` (on-demand skills)
-- `~/.claude/.ccg/{config.toml,prompts/}`
+- `~/.claude/.ccg/{config.toml,prompts/}` (includes Claude dispatch helpers `osm-report.md`, `osm-ledger.md`, and `hapi-mcp.md`)
 - `~/.claude/rules/ccg-codegraph.md`
 - `~/.claude/bin/codeagent-wrapper`
 - `~/.claude/bin/osm` (decision-ledger launcher; runs this checkout's `bin/ccg.mjs` with the installing Node)

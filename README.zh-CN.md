@@ -90,6 +90,7 @@ Install OpenSlime from https://github.com/Overbaker/OpenSlime. Follow AGENTS.md 
   - 更大的改动通过 `resume` 退回给执行者。
   - 同一执行者失败两次后，先问你再决定是否接管。
 - **始终交叉校验。** research、plan、review 都让 codex 和 antigravity 各自在新会话里独立完成，由 Claude 对比两者一致和分歧的地方。
+- **HAPI 会话联动。** 在可用 `mcp__hapi__spawn_peer` 的 HAPI 会话内，`/osm:*` 会自动通过 HAPI MCP 派发并等待回传（`antigravity` 映射为 `agy`），让子代理成为可直达的父子关联会话；传入 `--no-hapi-mcp` 或处于 HAPI 外部时回退到 `codeagent-wrapper`。
 - **阶段报告。** 每次运行结束都在 `${TMPDIR:-/tmp}/osm-reports/` 生成一份报告，附带置信度（高/中/低，百分比）。
 
 ## 账本细节
