@@ -9,18 +9,59 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 )
 
+// Browser modes for the Web UI, chosen by CODEAGENT_BROWSER.
+const (
+	browserModeDefault = "default" // open the system default browser
+	browserModeBuiltin = "builtin" // open nothing; the orchestrator opens the URL itself
+)
+
+func browserMode() string {
+	if strings.EqualFold(strings.TrimSpace(os.Getenv("CODEAGENT_BROWSER")), browserModeBuiltin) {
+		return browserModeBuiltin
+	}
+	return browserModeDefault
+}
+
+func webUIBanner(url, mode string) string {
+	if mode == browserModeBuiltin {
+		return fmt.Sprintf("  Web UI: %s (open in the builtin browser)\n", url)
+	}
+	return fmt.Sprintf("  Web UI: %s\n", url)
+}
+
+// requireLocalHost rejects requests whose Host header does not name this
+// machine. Binding to loopback keeps other machines out, but a page the user
+// has open can still point its own domain at 127.0.0.1 (DNS rebinding) and read
+// the stream as same-origin; the Host header is what gives that away.
+func requireLocalHost(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		host := r.Host
+		if h, _, err := net.SplitHostPort(host); err == nil {
+			host = h
+		}
+		switch strings.ToLower(strings.Trim(host, "[]")) {
+		case "localhost", "127.0.0.1", "::1":
+			next.ServeHTTP(w, r)
+		default:
+			http.Error(w, "Forbidden", http.StatusForbidden)
+		}
+	})
+}
+
 // WebServer manages SSE connections for real-time output streaming
 type WebServer struct {
-	mu       sync.RWMutex
-	clients  map[string][]chan ContentEvent
-	sessions map[string]*SessionState
-	server   *http.Server
-	port     int
-	backend  string // Current backend name for single-panel display
+	mu         sync.RWMutex
+	clients    map[string][]chan ContentEvent
+	sessions   map[string]*SessionState
+	server     *http.Server
+	port       int
+	listenAddr string
+	backend    string // Current backend name for single-panel display
 }
 
 // SessionState tracks a running session
@@ -62,20 +103,23 @@ func (ws *WebServer) Start() error {
 	mux.HandleFunc("/api/sessions", ws.handleSessions)
 	mux.HandleFunc("/api/stream/", ws.handleStream)
 
-	// Listen on port 0 to get a random available port
-	listener, err := net.Listen("tcp", ":0")
+	// Listen on a random loopback port: the stream carries code and model
+	// output, so it must not be reachable from other machines on the network.
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		return err
 	}
 
 	ws.port = listener.Addr().(*net.TCPAddr).Port
+	ws.listenAddr = listener.Addr().String()
 
 	ws.server = &http.Server{
-		Handler: mux,
+		Handler: requireLocalHost(mux),
 	}
 
 	url := fmt.Sprintf("http://localhost:%d", ws.port)
-	fmt.Fprintf(os.Stderr, "  Web UI: %s\n", url)
+	mode := browserMode()
+	fmt.Fprint(os.Stderr, webUIBanner(url, mode))
 
 	go func() {
 		if err := ws.server.Serve(listener); err != nil && err != http.ErrServerClosed {
@@ -83,8 +127,10 @@ func (ws *WebServer) Start() error {
 		}
 	}()
 
-	// Auto-open browser
-	go openBrowser(url)
+	// Auto-open the default browser unless the orchestrator opens the URL itself
+	if mode == browserModeDefault {
+		go openBrowser(url)
+	}
 
 	return nil
 }
@@ -383,7 +429,12 @@ func (ws *WebServer) generateIndexHTML() string {
                 if (session.task) {
                     const taskEl = document.createElement('div');
                     taskEl.style.cssText = 'color: #58a6ff; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #30363d;';
-                    taskEl.innerHTML = '<strong>📋 Task:</strong><br>' + session.task.replace(/\n/g, '<br>');
+                    const taskTitle = document.createElement('strong');
+                    taskTitle.textContent = '📋 Task:';
+                    const taskBody = document.createElement('div');
+                    taskBody.style.whiteSpace = 'pre-wrap';
+                    taskBody.textContent = session.task;
+                    taskEl.append(taskTitle, taskBody);
                     output.appendChild(taskEl);
                     // Scroll to bottom after displaying task
                     setTimeout(scrollToBottom, 0);
@@ -493,7 +544,6 @@ func (ws *WebServer) handleStream(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {

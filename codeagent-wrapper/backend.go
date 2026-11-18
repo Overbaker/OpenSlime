@@ -140,6 +140,16 @@ func buildAntigravityArgs(cfg *Config, targetArg string) []string {
 		args = append(args, "--add-dir", cfg.WorkDir)
 	}
 
+	// Session-only agy settings (e.g. permissions.deny rules), so a denied tool
+	// is reported back to the model instead of ending the headless turn.
+	if settings := strings.TrimSpace(os.Getenv("CODEAGENT_AGY_SETTINGS")); settings != "" {
+		args = append(args, "--settings", settings)
+	}
+
+	// stream-json carries the conversation_id that --conversation resumes;
+	// plain text output has none. See parseAntigravityStream.
+	args = append(args, "--output-format", "stream-json")
+
 	// -p must come right before the prompt text (last positional arg)
 	args = append(args, "-p", targetArg)
 	return args

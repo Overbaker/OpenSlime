@@ -69,7 +69,7 @@ func TestAntigravityBuildArgs_AlwaysSkipsPermissions(t *testing.T) {
 
 	t.Run("new mode", func(t *testing.T) {
 		got := backend.BuildArgs(&Config{Mode: "new", WorkDir: "/repo"}, "task")
-		want := []string{"--dangerously-skip-permissions", "--add-dir", "/repo", "-p", "task"}
+		want := []string{"--dangerously-skip-permissions", "--add-dir", "/repo", "--output-format", "stream-json", "-p", "task"}
 		if !reflect.DeepEqual(got, want) {
 			t.Fatalf("got %v, want %v", got, want)
 		}
@@ -77,7 +77,7 @@ func TestAntigravityBuildArgs_AlwaysSkipsPermissions(t *testing.T) {
 
 	t.Run("resume mode", func(t *testing.T) {
 		got := backend.BuildArgs(&Config{Mode: "resume", SessionID: "conv-1", WorkDir: "/repo"}, "more")
-		want := []string{"--dangerously-skip-permissions", "--conversation", "conv-1", "-p", "more"}
+		want := []string{"--dangerously-skip-permissions", "--conversation", "conv-1", "--output-format", "stream-json", "-p", "more"}
 		if !reflect.DeepEqual(got, want) {
 			t.Fatalf("got %v, want %v", got, want)
 		}

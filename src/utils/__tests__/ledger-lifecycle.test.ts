@@ -24,7 +24,7 @@ function manifest(dir: string): string {
 
 async function prepareWrapper(installDir: string): Promise<void> {
   await fs.ensureDir(join(installDir, 'bin'))
-  if (process.platform !== 'win32') await fs.writeFile(join(installDir, 'bin', 'codeagent-wrapper'), '#!/usr/bin/env node\nconsole.log("codeagent-wrapper version 5.15.0")\n', { mode: 0o755 })
+  if (process.platform !== 'win32') await fs.writeFile(join(installDir, 'bin', 'codeagent-wrapper'), '#!/usr/bin/env node\nconsole.log("codeagent-wrapper version 5.16.0")\n', { mode: 0o755 })
 }
 
 describe('P13: install, force-install and uninstall preserve the ledger', () => {

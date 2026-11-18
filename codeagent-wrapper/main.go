@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	version               = "5.15.0"
+	version               = "5.16.0"
 	defaultWorkdir        = "."
 	defaultTimeout        = 7200 // seconds (2 hours)
 	defaultCoverageTarget = 90.0
@@ -617,6 +617,8 @@ Environment Variables:
     CODEX_DISABLE_SKIP_GIT_CHECK  Disable skip-git-repo-check flag (default: false)
     CODEAGENT_ASCII_MODE       Use ASCII symbols instead of Unicode (PASS/WARN/FAIL)
     CODEAGENT_LITE_MODE        Enable lite mode (true/false)
+    CODEAGENT_BROWSER          Web UI browser: default opens the system browser, builtin opens none
+    CODEAGENT_AGY_SETTINGS     Session settings file passed to agy as --settings (needs an agy that has it)
 
 Exit Codes:
     0    Success

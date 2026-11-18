@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -205,6 +204,7 @@ var newCommandRunner = func(ctx context.Context, name string, args ...string) co
 type parseResult struct {
 	message  string
 	threadID string
+	failure  string // why the backend says the turn failed, when it says so
 }
 
 type taskLoggerContextKey struct{}
@@ -1114,37 +1114,29 @@ func runCodexTaskWithContext(parentCtx context.Context, taskSpec TaskSpec, backe
 		}
 	}
 
-	// Antigravity CLI outputs plain text (no JSON streaming).
-	// Read stdout directly instead of parsing JSON events.
-	isPlainTextBackend := cfg.Backend == "antigravity"
+	// Antigravity CLI emits its own stream-json format (see buildAntigravityArgs),
+	// parsed separately from the codex/gemini/claude event stream.
+	isAntigravityBackend := cfg.Backend == "antigravity"
 
 	go func() {
-		if isPlainTextBackend {
-			scanner := bufio.NewScanner(stdoutReader)
-			scanner.Buffer(make([]byte, 0, 256*1024), 10*1024*1024)
-			var sb strings.Builder
-			firstLine := true
-			for scanner.Scan() {
-				line := scanner.Text()
-				if firstLine {
-					firstLine = false
-					select {
-					case messageSeen <- struct{}{}:
-					default:
+		if isAntigravityBackend {
+			firstText := true
+			msg, tid, failure := parseAntigravityStream(stdoutReader, agyStreamHandlers{
+				onSession: onSessionStartedCallback,
+				onText: func(text string) {
+					if firstText {
+						firstText = false
+						select {
+						case messageSeen <- struct{}{}:
+						default:
+						}
 					}
-				}
-				if sb.Len() > 0 {
-					sb.WriteByte('\n')
-				}
-				sb.WriteString(line)
-				if onContentCallback != nil {
-					onContentCallback(line+"\n", "text")
-				}
-				if onProgressCallback != nil {
-					onProgressCallback(line)
-				}
-			}
-			msg := strings.TrimSpace(sb.String())
+					if onContentCallback != nil {
+						onContentCallback(text, "text")
+					}
+				},
+				onLine: onProgressCallback,
+			})
 			select {
 			case completeSeen <- struct{}{}:
 			default:
@@ -1152,7 +1144,7 @@ func runCodexTaskWithContext(parentCtx context.Context, taskSpec TaskSpec, backe
 			if globalWebServer != nil && webSessionID != "" {
 				globalWebServer.EndSession(webSessionID, cfg.Backend)
 			}
-			parseCh <- parseResult{message: msg}
+			parseCh <- parseResult{message: msg, threadID: tid, failure: failure}
 			return
 		}
 
@@ -1368,10 +1360,17 @@ waitLoop:
 
 	message := parsed.message
 	threadID := parsed.threadID
+	if parsed.failure != "" {
+		logWarnFn(fmt.Sprintf("%s reported failure: %s", commandName, parsed.failure))
+	}
 	if message == "" {
-		logErrorFn(fmt.Sprintf("%s completed without agent_message output", commandName))
+		reason := fmt.Sprintf("%s completed without agent_message output", commandName)
+		if parsed.failure != "" {
+			reason = fmt.Sprintf("%s failed: %s", commandName, parsed.failure)
+		}
+		logErrorFn(reason)
 		result.ExitCode = 1
-		result.Error = attachStderr(fmt.Sprintf("%s completed without agent_message output", commandName))
+		result.Error = attachStderr(reason)
 		return result
 	}
 
