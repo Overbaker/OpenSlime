@@ -290,6 +290,32 @@ func TestLoadMinimalEnvSettings(t *testing.T) {
 	})
 }
 
+func TestAntigravityBuildArgs_AlwaysSkipsPermissions(t *testing.T) {
+	t.Run("new mode adds workdir", func(t *testing.T) {
+		cfg := &Config{Mode: "new", WorkDir: "/tmp/project", Backend: "antigravity"}
+		got := buildAntigravityArgs(cfg, "do the task")
+		want := []string{"--dangerously-skip-permissions", "--add-dir", "/tmp/project", "-p", "do the task"}
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("got %v, want %v", got, want)
+		}
+	})
+
+	t.Run("resume mode uses conversation", func(t *testing.T) {
+		cfg := &Config{Mode: "resume", SessionID: "conv-1", WorkDir: "/tmp/project", Backend: "antigravity"}
+		got := buildAntigravityArgs(cfg, "follow-up")
+		want := []string{"--dangerously-skip-permissions", "--conversation", "conv-1", "-p", "follow-up"}
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("got %v, want %v", got, want)
+		}
+	})
+
+	t.Run("nil config", func(t *testing.T) {
+		if got := buildAntigravityArgs(nil, "x"); got != nil {
+			t.Fatalf("nil config should return nil, got %v", got)
+		}
+	})
+}
+
 func TestGrokBuildArgs_NewMode(t *testing.T) {
 	cfg := &Config{Mode: "new", WorkDir: "/tmp/project", Backend: "grok"}
 	args := buildGrokArgs(cfg, "do the task")

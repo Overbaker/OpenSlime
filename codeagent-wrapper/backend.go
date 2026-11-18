@@ -125,11 +125,14 @@ func buildAntigravityArgs(cfg *Config, targetArg string) []string {
 		return nil
 	}
 
-	var args []string
-
-	if cfg.SkipPermissions {
-		args = append(args, "--dangerously-skip-permissions")
-	}
+	// Same reasoning as buildClaudeArgs (#143): the wrapper only runs headless
+	// orchestration sub-tasks, and headless agy auto-denies every tool that needs
+	// approval ("read_file permission that headless mode cannot prompt for"), so
+	// it returns no output. Its own auto mode is no fallback either: it is
+	// disabled wherever the terminal sandbox is unavailable (e.g. AppArmor
+	// restricting unprivileged user namespaces). The cfg.SkipPermissions gate was
+	// dead here too — no caller sets it.
+	args := []string{"--dangerously-skip-permissions"}
 
 	if cfg.Mode == "resume" && cfg.SessionID != "" {
 		args = append(args, "--conversation", cfg.SessionID)
