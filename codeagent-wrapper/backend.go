@@ -125,11 +125,12 @@ func buildAntigravityArgs(cfg *Config, targetArg string) []string {
 		return nil
 	}
 
-	var args []string
-
-	if cfg.SkipPermissions {
-		args = append(args, "--dangerously-skip-permissions")
-	}
+	// Always non-interactive, like buildClaudeArgs (#143). Headless `-p` cannot
+	// prompt, so without this agy auto-denies tool calls it would ask about —
+	// e.g. read_file outside --add-dir (~/.claude/...) — and returns no output.
+	// On hosts without a terminal sandbox, Auto mode falls back to Default and
+	// asks for even more. A PreToolUse hook returning "allow" does not override it.
+	args := []string{"--dangerously-skip-permissions"}
 
 	if cfg.Mode == "resume" && cfg.SessionID != "" {
 		args = append(args, "--conversation", cfg.SessionID)

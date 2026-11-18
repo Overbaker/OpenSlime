@@ -64,6 +64,26 @@ func TestClaudeBuildArgs_ModesAndPermissions(t *testing.T) {
 	})
 }
 
+func TestAntigravityBuildArgs_AlwaysSkipsPermissions(t *testing.T) {
+	backend := AntigravityBackend{}
+
+	t.Run("new mode", func(t *testing.T) {
+		got := backend.BuildArgs(&Config{Mode: "new", WorkDir: "/repo"}, "task")
+		want := []string{"--dangerously-skip-permissions", "--add-dir", "/repo", "-p", "task"}
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("got %v, want %v", got, want)
+		}
+	})
+
+	t.Run("resume mode", func(t *testing.T) {
+		got := backend.BuildArgs(&Config{Mode: "resume", SessionID: "conv-1", WorkDir: "/repo"}, "more")
+		want := []string{"--dangerously-skip-permissions", "--conversation", "conv-1", "-p", "more"}
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("got %v, want %v", got, want)
+		}
+	})
+}
+
 func TestClaudeBuildArgs_GeminiAndCodexModes(t *testing.T) {
 	t.Run("gemini new mode passes workdir via include-directories", func(t *testing.T) {
 		backend := GeminiBackend{}
