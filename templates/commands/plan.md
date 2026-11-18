@@ -34,7 +34,7 @@ description: 'codex + antigravity 交叉分析 → 消除歧义 → 零决策可
    Bash({
      command: "~/.claude/bin/codeagent-wrapper --progress --backend {{BACKEND_PRIMARY}} {{GEMINI_MODEL_FLAG}}{{GROK_MODEL_FLAG}}{{KIMI_MODEL_FLAG}}{{OPENCODE_MODEL_FLAG}}- \"{{WORKDIR}}\" <<'EOF'\nAnalyze change <change_id> from backend perspective:\n- Implementation approach\n- Technical risks\n- Alternative architectures\n- Edge cases and failure modes\nOUTPUT: JSON with analysis\nEOF",
      run_in_background: true,
-     timeout: 300000,
+     timeout: 3600000,
      description: "{{BACKEND_PRIMARY}}: backend analysis"
    })
    ```
@@ -44,14 +44,14 @@ description: 'codex + antigravity 交叉分析 → 消除歧义 → 零决策可
    Bash({
      command: "~/.claude/bin/codeagent-wrapper --progress --backend {{FRONTEND_PRIMARY}} {{GEMINI_MODEL_FLAG}}{{GROK_MODEL_FLAG}}{{KIMI_MODEL_FLAG}}{{OPENCODE_MODEL_FLAG}}- \"{{WORKDIR}}\" <<'EOF'\nAnalyze change <change_id> from frontend/integration perspective:\n- Maintainability assessment\n- Scalability considerations\n- Integration conflicts\nOUTPUT: JSON with analysis\nEOF",
      run_in_background: true,
-     timeout: 300000,
+     timeout: 3600000,
      description: "{{FRONTEND_PRIMARY}}: integration analysis"
    })
    ```
 
    **Step 2.2**: Wait for every launched call to finish before synthesizing.
 
-   - 后台调用完成时会自动通知，不要轮询。后端模型常需 5-15 分钟；超过 timeout 就报告用户，不要无限等待。
+   - 后台调用完成时会自动通知，不要轮询。后端模型常需 5-15 分钟，timeout 上限 60 分钟。到时仍未完成：报告用户并询问是否继续等待，不要自行杀掉后台任务。
    - 某个模型失败：重试一次；仍失败就用另一方的结果继续，并在阶段报告里把置信度下调一档。
 
    - Synthesize responses and present consolidated options to user.

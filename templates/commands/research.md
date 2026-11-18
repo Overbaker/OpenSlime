@@ -59,7 +59,7 @@ description: '需求 → 约束集（codex + antigravity 交叉探索 + OpenSpec
    Bash({
      command: "~/.claude/bin/codeagent-wrapper --progress --backend {{BACKEND_PRIMARY}} {{GEMINI_MODEL_FLAG}}{{GROK_MODEL_FLAG}}{{KIMI_MODEL_FLAG}}{{OPENCODE_MODEL_FLAG}}- \"{{WORKDIR}}\" <<'EOF'\nExplore backend context boundaries for <change description>:\n- Existing structures and patterns\n- Conventions in use\n- Hard constraints limiting solution space\n- Dependencies and risks\nOUTPUT: JSON using the output template above\nEOF",
      run_in_background: true,
-     timeout: 300000,
+     timeout: 3600000,
      description: "{{BACKEND_PRIMARY}}: backend boundary exploration"
    })
    ```
@@ -69,14 +69,14 @@ description: '需求 → 约束集（codex + antigravity 交叉探索 + OpenSpec
    Bash({
      command: "~/.claude/bin/codeagent-wrapper --progress --backend {{FRONTEND_PRIMARY}} {{GEMINI_MODEL_FLAG}}{{GROK_MODEL_FLAG}}{{KIMI_MODEL_FLAG}}{{OPENCODE_MODEL_FLAG}}- \"{{WORKDIR}}\" <<'EOF'\nIndependently explore context boundaries for <change description> from the integration and user-facing side (frontend if any):\n- Existing structures and patterns\n- Conventions in use\n- Hard constraints limiting solution space\n- Dependencies and risks\nOUTPUT: JSON using the output template above\nEOF",
      run_in_background: true,
-     timeout: 300000,
+     timeout: 3600000,
      description: "{{FRONTEND_PRIMARY}}: integration/user-facing exploration"
    })
    ```
 
    **Step 4.2**: Wait for every launched call to finish before synthesizing.
 
-   - 后台调用完成时会自动通知，不要轮询。后端模型常需 5-15 分钟；超过 timeout 就报告用户，不要无限等待。
+   - 后台调用完成时会自动通知，不要轮询。后端模型常需 5-15 分钟，timeout 上限 60 分钟。到时仍未完成：报告用户并询问是否继续等待，不要自行杀掉后台任务。
    - 某个模型失败：重试一次；仍失败就用另一方的结果继续，并在阶段报告里把置信度下调一档。
 
 5. **Aggregate and Synthesize**

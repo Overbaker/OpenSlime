@@ -61,7 +61,7 @@ description: 'codex/antigravity 按任务写代码，Claude 监控审查 + 归�
    VERIFY: <test/build command to run before reporting>
    EOF
    ```
-   Save each returned `SESSION_ID` to resume the same writer for fixes.
+   Run it with `Bash({ ..., run_in_background: true, timeout: 3600000 })`; the same waiting rules as Step 6.2 apply. Save each returned `SESSION_ID` to resume the same writer for fixes.
 
    **Exploratory comparison writer** (only when `$ARGUMENTS` contains `--compare explore` or the user asks; doubles writing cost; recorded as a confounded probe and never credited to a lesson, see `~/.claude/.ccg/prompts/claude/osm-ledger.md`):
    - In the same message as the writer call, spawn one subagent: `Agent({ subagent_type: "general-purpose", isolation: "worktree", run_in_background: true, prompt })`. Main Claude and the main writer never load its skills or see its draft until review.
@@ -87,7 +87,7 @@ description: 'codex/antigravity 按任务写代码，Claude 监控审查 + 归�
    Bash({
      command: "~/.claude/bin/codeagent-wrapper --progress --backend {{BACKEND_PRIMARY}} {{GEMINI_MODEL_FLAG}}{{GROK_MODEL_FLAG}}{{KIMI_MODEL_FLAG}}{{OPENCODE_MODEL_FLAG}}- \"{{WORKDIR}}\" <<'EOF'\nROLE_FILE: ~/.claude/.ccg/prompts/{{BACKEND_PRIMARY}}/reviewer.md\nReview the uncommitted changes for <task> against the spec constraints. Read callers of every changed function, not only the diff.\nMain candidate: {{WORKDIR}}; inspect `git -C \"{{WORKDIR}}\" diff` and its changed files. With --compare explore, also inspect comparison candidate at <worktree>, base commit <base>: `git -C \"<worktree>\" diff <base>` and its changed files. Report findings separately for each candidate, including candidate name on every finding.\nOUTPUT: JSON with findings per candidate\nEOF",
      run_in_background: true,
-     timeout: 300000,
+     timeout: 3600000,
      description: "{{BACKEND_PRIMARY}}: correctness/security review"
    })
    ```
@@ -97,14 +97,14 @@ description: 'codex/antigravity 按任务写代码，Claude 监控审查 + 归�
    Bash({
      command: "~/.claude/bin/codeagent-wrapper --progress --backend {{FRONTEND_PRIMARY}} {{GEMINI_MODEL_FLAG}}{{GROK_MODEL_FLAG}}{{KIMI_MODEL_FLAG}}{{OPENCODE_MODEL_FLAG}}- \"{{WORKDIR}}\" <<'EOF'\nROLE_FILE: ~/.claude/.ccg/prompts/{{FRONTEND_PRIMARY}}/reviewer.md\nIndependently review the uncommitted changes for <task>: logic, integration and security; UI states and accessibility if UI code changed.\nMain candidate: {{WORKDIR}}; inspect `git -C \"{{WORKDIR}}\" diff` and its changed files. With --compare explore, also inspect comparison candidate at <worktree>, base commit <base>: `git -C \"<worktree>\" diff <base>` and its changed files. Report findings separately for each candidate, including candidate name on every finding.\nOUTPUT: JSON with findings per candidate\nEOF",
      run_in_background: true,
-     timeout: 300000,
+     timeout: 3600000,
      description: "{{FRONTEND_PRIMARY}}: maintainability/patterns review"
    })
    ```
 
    **Step 6.2**: Wait for every launched call to finish before synthesizing.
 
-   - 后台调用完成时会自动通知，不要轮询。后端模型常需 5-15 分钟；超过 timeout 就报告用户，不要无限等待。
+   - 后台调用完成时会自动通知，不要轮询。后端模型常需 5-15 分钟，timeout 上限 60 分钟。到时仍未完成：报告用户并询问是否继续等待，不要自行杀掉后台任务。
    - 某个模型失败：重试一次；仍失败就用另一方的结果继续，并在阶段报告里把置信度下调一档。
 
    - Use a fresh session (no `resume`): the writer reviewing its own work misses the same things twice.

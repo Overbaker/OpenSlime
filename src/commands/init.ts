@@ -16,12 +16,25 @@ import { PACKAGE_ROOT } from '../utils/installer-template'
 import { getSkillCatalog, installedNames, removeSkills, resolveSkillPaths, SKILL_MANIFEST_FILE } from '../utils/skill-manager'
 
 /**
+ * Env defaults for codeagent-wrapper, written to settings.json `env` so every
+ * Bash call from a slash command inherits them.
+ * - LITE_MODE: no Web UI / browser launch (headless hosts have none) and a 1s
+ *   post-message delay instead of 5s.
+ * - MAX_PARALLEL_WORKERS: caps one `--parallel` batch; each backend process
+ *   (agy, codex) uses hundreds of MB.
+ */
+export const WRAPPER_ENV_DEFAULTS: Record<string, string> = {
+  CODEAGENT_LITE_MODE: 'true',
+  CODEAGENT_MAX_PARALLEL_WORKERS: '3',
+}
+
+/**
  * Auto-approve codeagent-wrapper Bash commands in settings.json.
  *
  * All platforms use permissions.allow with wildcard pattern (v1.7.89+).
  * Old Hook-based approach and old permission entries are automatically cleaned up.
  */
-async function installHook(settingsPath: string): Promise<'permission' | 'skipped'> {
+export async function installHook(settingsPath: string): Promise<'permission' | 'skipped'> {
   let settings: Record<string, any> = {}
   if (await fs.pathExists(settingsPath)) {
     try {
@@ -68,6 +81,13 @@ async function installHook(settingsPath: string): Promise<'permission' | 'skippe
   const permEntry = 'Bash(*codeagent-wrapper*)'
   if (!settings.permissions.allow.includes(permEntry)) {
     settings.permissions.allow.push(permEntry)
+  }
+
+  // Headless wrapper defaults; a value the user already set wins.
+  settings.env ??= {}
+  for (const [key, value] of Object.entries(WRAPPER_ENV_DEFAULTS)) {
+    if (!(key in settings.env))
+      settings.env[key] = value
   }
 
   await fs.writeJSON(settingsPath, settings, { spaces: 2 })
