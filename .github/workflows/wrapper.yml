@@ -1,6 +1,6 @@
 name: Wrapper
 
-# Only when the Go wrapper changes; OpenSlime ships it unmodified from upstream.
+# Only when the Go wrapper changes; OpenSlime carries its own patches on top of upstream.
 # TestBackendRunCoverage is intermittent on GitHub runners (upstream code); rerun before debugging.
 on:
   push:

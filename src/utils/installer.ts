@@ -91,8 +91,10 @@ export type { SkillMeta } from './skill-registry'
  * Expected codeagent-wrapper binary version.
  * Must match the `version` constant in codeagent-wrapper/main.go.
  * When this differs from the installed binary, update triggers re-download.
+ * The `-osm.N` suffix keeps an upstream binary of the same base version from
+ * passing the check.
  */
-const EXPECTED_BINARY_VERSION = '5.16.0'
+const EXPECTED_BINARY_VERSION = '5.16.0-osm.1'
 
 // ═══════════════════════════════════════════════════════
 // Install context — shared across sub-functions
@@ -126,12 +128,13 @@ interface InstallContext {
 // Binary download
 // ═══════════════════════════════════════════════════════
 
-const GITHUB_REPO = 'fengshao1227/ccg-workflow'
+// The fork's own release (built by .github/workflows/build-binaries.yml from
+// main). Upstream's release and its R2 mirror ship upstream's wrapper, which
+// lacks the fork's patches (e.g. headless antigravity permissions).
+const GITHUB_REPO = 'Overbaker/OpenSlime'
 const RELEASE_TAG = 'preset'
 
-/** Download sources: R2 CDN first (China-friendly) → GitHub fallback (global) */
 const BINARY_SOURCES = [
-  { name: 'Cloudflare CDN', url: 'https://github.20031227.xyz/preset', timeoutMs: 30_000 },
   { name: 'GitHub Release', url: `https://github.com/${GITHUB_REPO}/releases/download/${RELEASE_TAG}`, timeoutMs: 120_000 },
 ]
 
@@ -195,8 +198,8 @@ async function downloadFromUrl(url: string, destPath: string, timeoutMs: number,
 }
 
 /**
- * Download codeagent-wrapper binary with dual-source fallback.
- * Strategy: R2 mirror (60s) → GitHub Release (120s). Uses curl for proxy support.
+ * Download the codeagent-wrapper binary from the fork's GitHub Release.
+ * Uses curl for proxy support.
  */
 async function downloadBinaryFromRelease(binaryName: string, destPath: string): Promise<boolean> {
   for (const source of BINARY_SOURCES) {

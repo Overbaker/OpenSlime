@@ -1,7 +1,10 @@
 name: Build codeagent-wrapper binaries
 
+# Publishes the `preset` release that `ccg init` downloads from. Only main may
+# publish: a push from a feature branch would replace the binaries everyone installs.
 on:
   push:
+    branches: [main]
     paths:
       - 'codeagent-wrapper/**'
   workflow_dispatch:
@@ -56,8 +59,8 @@ jobs:
           tag_name: preset
           name: "Pre-built Binaries (codeagent-wrapper)"
           body: |
-            Pre-compiled `codeagent-wrapper` binaries for all supported platforms.
-            Automatically downloaded during `npx ccg-workflow` installation.
+            Pre-compiled OpenSlime `codeagent-wrapper` binaries for all supported platforms.
+            Downloaded by `node bin/ccg.mjs init` when the installed version does not match.
 
             | File | Platform | Architecture |
             |------|----------|-------------|
@@ -68,26 +71,7 @@ jobs:
             | `codeagent-wrapper-windows-amd64.exe` | Windows | x64 |
             | `codeagent-wrapper-windows-arm64.exe` | Windows | ARM64 |
 
-            > This release is automatically updated when `codeagent-wrapper/` source changes.
-            > Mirror: Cloudflare R2 (auto-synced)
+            > This release is updated when `codeagent-wrapper/` changes on main.
           files: artifacts/*
           prerelease: true
           make_latest: false
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      - name: Install wrangler
-        run: npm i -g wrangler@latest
-
-      - name: Sync binaries to Cloudflare R2 mirror
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          for bin in artifacts/codeagent-wrapper-*; do
-            name=$(basename "$bin")
-            echo "Uploading $name → R2..."
-            wrangler r2 object put "github/preset/$name" --file="$bin" --content-type=application/octet-stream --remote
-          done
