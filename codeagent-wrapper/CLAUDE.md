@@ -3,7 +3,7 @@
 > [根目录](../CLAUDE.md) > **codeagent-wrapper**
 
 **Last Updated**: 2026-08-29
-**Binary Version**: v5.16.0
+**Binary Version**: v5.16.0-osm.2
 **Go Version**: 1.21+（`go.mod:1`）
 
 ---
@@ -91,6 +91,8 @@ diff、明令禁改文件）与修正调用（按 file:line 改）**不开**，�
 | `CODEAGENT_AGY_SETTINGS` | 作为 `--settings` 传给 agy 的配置文件（agy 1.4.7 还没有这个参数） | 空 |
 | `CODEAGENT_POST_MESSAGE_DELAY` | agent_message 后等待秒数（0-60） | 5s |
 | `CODEAGENT_MAX_PARALLEL_WORKERS` | 并行 worker 上限（0=不限） | 0 |
+| `CODEAGENT_STALL_TIMEOUT` | 后端 stdout 静默多少秒判为停滞（`0`/`off`/`false` 关闭）；只算秒，不做毫秒换算 | 600 |
+| `CODEAGENT_STALL_MAX_SILENT` | 后代进程仍在占 CPU 时最多再等到的静默秒数（`0`/`off`/`false` 关闭 CPU 宽限） | 900 |
 | `GEMINI_MODEL` | Gemini 型号（低优先级，CLI 参数覆盖） | 空 |
 
 ### 退出码
@@ -98,11 +100,19 @@ diff、明令禁改文件）与修正调用（按 file:line 改）**不开**，�
 | 码 | 含义 |
 |----|------|
 | 0 | 成功 |
-| 1 | 通用错误（参数缺失、无输出） |
+| 1 | 通用错误（参数缺失、无输出；claude 无 result 事件为 `INCOMPLETE: claude exited without a result event`，错误 result 为 `claude failed: <subtype>`） |
 | 124 | 超时 |
+| 125 | 停滞：stderr 为 `STALLED: <backend> produced no output for <N>s`；以文字前缀为准，后端自己也可能退出 125 |
 | 127 | 后端命令不在 PATH |
 | 130 | 用户中断（Ctrl+C） |
 | 其他 | 后端进程退出码透传 |
+
+已知 session ID 时，任何退出码都会在 stdout 打印 `SESSION_ID: <id>`。嵌套调用（后端里再跑 `codeagent-wrapper`）时外层等待期间没有输出，可能先被判停滞：调大外层 `CODEAGENT_STALL_TIMEOUT` 或设为 `0`。
+
+CPU 宽限的已知限制：
+- Windows 上不统计已退出子进程用过的 CPU。
+- macOS 等非 Linux 的 Unix 上，后端的直接子进程若在检查窗口内退出，其 CPU 不计入。
+- 后端经启动器运行时（npm 的 `codex` shim、`.cmd`），真正的后端进程算作后代：它空转不输出时要到 `CODEAGENT_STALL_MAX_SILENT` 才被杀，而不是 `CODEAGENT_STALL_TIMEOUT`。
 
 ---
 
@@ -299,8 +309,8 @@ bash build-all.sh
 
 | 文件 | 位置 | 当前值 |
 |------|------|--------|
-| `codeagent-wrapper/main.go` | `version = "..."` （`main.go:17`） | `5.16.0` |
-| `src/utils/installer.ts` | `EXPECTED_BINARY_VERSION = '...'` | `5.16.0` |
+| `codeagent-wrapper/main.go` | `version = "..."` （`main.go:17`） | `5.16.0-osm.2` |
+| `src/utils/installer.ts` | `EXPECTED_BINARY_VERSION = '...'` | `5.16.0-osm.2` |
 
 两边不一致的后果：用户运行 `npx ccg-workflow update` 时无法触发 binary 重新下载，继续使用旧版 binary。
 

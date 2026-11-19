@@ -89,6 +89,8 @@ Install OpenSlime from https://github.com/Overbaker/OpenSlime. Follow AGENTS.md 
   - 不改变行为、不超过 5 行的机械问题，Claude 自己修，然后重跑 `VERIFY`。
   - 更大的改动通过 `resume` 退回给执行者。
   - 同一执行者失败两次后，先问你再决定是否接管。
+- **卡住的调用提前结束。** 后端 10 分钟没有任何输出（它的工具仍在占用 CPU 时为 15 分钟）就会被终止，调用以 `STALLED:` 结束；Claude 用返回的 `SESSION_ID` 续跑一次，算作该模型的那一次重试。设 `CODEAGENT_STALL_TIMEOUT=0` 可关闭。
+- **可追溯的提交和 pull request。** 你让 `/osm:impl` 提交或开 pull request 时，提交信息或 PR 描述末尾带一行 `via OpenSlime` 和 `OSM-Change`、`OSM-Specs`、`OSM-Writers`、`OSM-Reviewers` 这几个 trailer。它们不会写进代码、注释或文档。`/osm:impl --no-trace` 不加。
 - **始终交叉校验。** research、plan、review 都让 codex 和 antigravity 各自在新会话里独立完成，由 Claude 对比两者一致和分歧的地方。
 - **阶段报告。** 每次运行结束都在 `${TMPDIR:-/tmp}/osm-reports/` 生成一份报告，附带置信度（高/中/低，百分比）。
 

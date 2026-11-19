@@ -86,6 +86,8 @@ Manual steps: [AGENTS.md](AGENTS.md).
 
 - **Scoped writers.** In `/osm:impl`, `codex` writes backend, logic and tests, and `antigravity` writes UI. Each task lists the files its writer may touch.
 - **Claude supervises.** It fixes behaviour-preserving slips of &le;5 lines itself and re-runs `VERIFY`. Anything bigger goes back to the writer via `resume`; after two failed tries it asks you before taking over.
+- **Stalled calls end early.** A backend that writes nothing for 10 minutes (15 while its tools still use CPU) is killed and the call ends with `STALLED:`; Claude resumes the returned `SESSION_ID` once, as that model's one retry. Set `CODEAGENT_STALL_TIMEOUT=0` to turn this off.
+- **Traceable commits and pull requests.** When you ask `/osm:impl` to commit or open a pull request, the commit message or PR description ends with a `via OpenSlime` line and `OSM-Change`, `OSM-Specs`, `OSM-Writers` and `OSM-Reviewers` trailers. They never go into code, comments or docs. `/osm:impl --no-trace` leaves them out.
 - **Always cross-checked.** Research, plan and review run codex and antigravity in separate fresh sessions, and Claude compares where they agree and where they don't.
 - **Stage report.** Every run ends with a report in `${TMPDIR:-/tmp}/osm-reports/` that includes a confidence estimate (High/Medium/Low, %).
 

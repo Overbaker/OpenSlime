@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	version               = "5.16.0-osm.1"
+	version               = "5.16.0-osm.2"
 	defaultWorkdir        = "."
 	defaultTimeout        = 7200 // seconds (2 hours)
 	defaultCoverageTarget = 90.0
@@ -23,6 +23,7 @@ const (
 	stderrCaptureLimit    = 4 * 1024
 	defaultBackendName    = "codex"
 	defaultCodexCommand   = "codex"
+	exitCodeStall         = 125
 
 	// stdout close reasons
 	stdoutCloseReasonWait  = "wait-done"
@@ -335,14 +336,7 @@ func run() (exitCode int) {
 			// --full-output: legacy full output mode
 			fmt.Println(generateFinalOutputWithMode(results, !fullOutput))
 
-			exitCode = 0
-			for _, res := range results {
-				if res.ExitCode != 0 {
-					exitCode = res.ExitCode
-				}
-			}
-
-			return exitCode
+			return parallelExitCode(results)
 		}
 	}
 
@@ -520,6 +514,12 @@ func run() (exitCode int) {
 	result := runTaskFn(taskSpec, false, cfg.Timeout)
 
 	if result.ExitCode != 0 {
+		if result.SessionID != "" {
+			fmt.Printf("\n---\nSESSION_ID: %s\n", result.SessionID)
+			if isWindows() {
+				_ = os.Stdout.Sync()
+			}
+		}
 		return result.ExitCode
 	}
 
@@ -535,6 +535,26 @@ func run() (exitCode int) {
 	}
 
 	return 0
+}
+
+func parallelExitCode(results []TaskResult) int {
+	exitCode := 0
+	sawTimeout := false
+	for _, res := range results {
+		switch res.ExitCode {
+		case 0:
+			continue
+		case exitCodeStall:
+			return exitCodeStall
+		case 124:
+			sawTimeout = true
+		}
+		exitCode = res.ExitCode
+	}
+	if sawTimeout {
+		return 124
+	}
+	return exitCode
 }
 
 func setLogger(l *Logger) {
@@ -619,11 +639,14 @@ Environment Variables:
     CODEAGENT_LITE_MODE        Enable lite mode (true/false)
     CODEAGENT_BROWSER          Web UI browser: default opens the system browser, builtin opens none
     CODEAGENT_AGY_SETTINGS     Session settings file passed to agy as --settings (needs an agy that has it)
+    CODEAGENT_STALL_TIMEOUT    Seconds without backend stdout before the backend is killed (default: 600; 0/off/false disables)
+    CODEAGENT_STALL_MAX_SILENT Ceiling in seconds for CPU-activity grace beyond the stall timeout (default: 900; 0/off/false disables)
 
 Exit Codes:
     0    Success
     1    General error (missing args, no output)
     124  Timeout
+    125  Stalled (no backend output for CODEAGENT_STALL_TIMEOUT seconds)
     127  backend command not found
     130  Interrupted (Ctrl+C)
     *    Passthrough from backend process`, name)

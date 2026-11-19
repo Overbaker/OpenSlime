@@ -31,9 +31,10 @@ type agyEvent struct {
 
 // agyStreamHandlers receive a stream as it arrives. Any of them may be nil.
 type agyStreamHandlers struct {
-	onSession func(id string)   // once, as soon as the conversation ID is known
-	onText    func(text string) // each piece of visible text
-	onLine    func(line string) // that text again, one complete non-blank line at a time
+	onSession  func(id string)   // once, as soon as the conversation ID is known
+	onText     func(text string) // each piece of visible text
+	onLine     func(line string) // that text again, one complete non-blank line at a time
+	onComplete func()            // when a result event without a failure has been parsed
 }
 
 // parseAntigravityStream reads agy stream-json output and returns the final
@@ -112,11 +113,17 @@ func parseAntigravityStream(r io.Reader, h agyStreamHandlers) (message, conversa
 				}
 				failure = "permission denied in headless mode: " + strings.Join(denied, ", ")
 			}
+			if failure == "" && h.onComplete != nil {
+				h.onComplete()
+			}
 		}
 	}
 	emitLine(partial.String())
 
 	switch {
+	case failure != "":
+		// A failed turn has no answer, not even the text streamed before it.
+		message = ""
 	case strings.TrimSpace(response) != "":
 		message = response
 	case deltas.Len() > 0:

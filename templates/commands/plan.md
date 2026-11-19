@@ -53,6 +53,7 @@ description: 'codex + antigravity 交叉分析 → 消除歧义 → 零决策可
 
    - 后台调用完成时会自动通知，不要轮询。后端模型常需 5-15 分钟，timeout 上限 60 分钟。到时仍未完成：报告用户并询问是否继续等待，不要自行杀掉后台任务。
    - 某个模型失败：重试一次；仍失败就用另一方的结果继续，并在阶段报告里把置信度下调一档。
+   - 输出含 `STALLED:` 或 `INCOMPLETE:`（wrapper 判定后端停滞或中断）：用返回的 `SESSION_ID` 执行一次 `resume <SESSION_ID>` 并说"继续"；没有 SESSION_ID 就重新发起一次。这算该模型的那一次重试。
 
    - Synthesize responses and present consolidated options to user.
 

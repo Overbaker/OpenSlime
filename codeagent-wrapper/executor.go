@@ -201,6 +201,65 @@ var newCommandRunner = func(ctx context.Context, name string, args ...string) co
 	return &realCmd{cmd: commandContext(ctx, name, args...)}
 }
 
+// activityReader records the time of the last Read that returned data, as a
+// monotonic offset from its creation so wall-clock steps and suspend/resume
+// do not count as silence.
+type activityReader struct {
+	r    io.Reader
+	base time.Time
+	last atomic.Int64
+}
+
+func newActivityReader(r io.Reader) *activityReader {
+	a := &activityReader{r: r, base: time.Now()}
+	a.touch()
+	return a
+}
+
+func (a *activityReader) Read(p []byte) (int, error) {
+	n, err := a.r.Read(p)
+	if n > 0 {
+		a.touch()
+	}
+	return n, err
+}
+
+func (a *activityReader) touch() {
+	a.last.Store(int64(time.Since(a.base)))
+}
+
+// idleAt returns how long stdout has been silent at now.
+func (a *activityReader) idleAt(now time.Time) time.Duration {
+	return now.Sub(a.base) - time.Duration(a.last.Load())
+}
+
+func (a *activityReader) lastActivity() int64 {
+	return a.last.Load()
+}
+
+var descendantCPUTimeFn = descendantCPUTime
+
+const stallCPUGraceMin = time.Second
+
+func stallTickInterval(stallTimeout time.Duration) time.Duration {
+	interval := stallTimeout / 10
+	if interval < 10*time.Millisecond {
+		interval = 10 * time.Millisecond
+	}
+	if interval > time.Second {
+		interval = time.Second
+	}
+	return interval
+}
+
+func stallCPUWindow(stallTimeout time.Duration) time.Duration {
+	w := stallTimeout / 2
+	if w > 60*time.Second {
+		w = 60 * time.Second
+	}
+	return w
+}
+
 type parseResult struct {
 	message  string
 	threadID string
@@ -438,7 +497,7 @@ func executeConcurrentWithContext(parentCtx context.Context, layers [][]TaskSpec
 
 		for _, task := range layer {
 			if skip, reason := shouldSkipTask(task, failed); skip {
-				res := TaskResult{TaskID: task.ID, ExitCode: 1, Error: reason}
+				res := TaskResult{TaskID: task.ID, ExitCode: 1, Error: reason, SessionID: strings.TrimSpace(task.SessionID)}
 				results = append(results, res)
 				failed[task.ID] = res
 				continue
@@ -446,6 +505,7 @@ func executeConcurrentWithContext(parentCtx context.Context, layers [][]TaskSpec
 
 			if ctx.Err() != nil {
 				res := cancelledTaskResult(task.ID, ctx)
+				res.SessionID = strings.TrimSpace(task.SessionID)
 				results = append(results, res)
 				failed[task.ID] = res
 				continue
@@ -464,7 +524,9 @@ func executeConcurrentWithContext(parentCtx context.Context, layers [][]TaskSpec
 				}()
 
 				if !acquireSlot() {
-					resultsCh <- cancelledTaskResult(ts.ID, ctx)
+					res := cancelledTaskResult(ts.ID, ctx)
+					res.SessionID = strings.TrimSpace(ts.SessionID)
+					resultsCh <- res
 					return
 				}
 				defer releaseSlot()
@@ -667,6 +729,9 @@ func generateFinalOutputWithMode(results []TaskResult, summaryOnly bool) string 
 				// Failed task: show error detail
 				sb.WriteString(fmt.Sprintf("\n### %s %s FAILED\n", taskID, failedSymbol))
 				sb.WriteString(fmt.Sprintf("Exit code: %d\n", res.ExitCode))
+				if res.SessionID != "" {
+					sb.WriteString(fmt.Sprintf("Session: %s\n", sanitizeOutput(res.SessionID)))
+				}
 				if errText := sanitizeOutput(res.Error); errText != "" {
 					sb.WriteString(fmt.Sprintf("Error: %s\n", errText))
 				}
@@ -870,6 +935,9 @@ func runCodexTaskWithContext(parentCtx context.Context, taskSpec TaskSpec, backe
 		result.Error = "resume mode requires non-empty session_id"
 		return result
 	}
+	if cfg.Mode == "resume" {
+		result.SessionID = strings.TrimSpace(cfg.SessionID)
+	}
 
 	useStdin := taskSpec.UseStdin
 	targetArg := taskSpec.Task
@@ -1069,9 +1137,10 @@ func runCodexTaskWithContext(parentCtx context.Context, taskSpec TaskSpec, backe
 		return result
 	}
 
-	stdoutReader := io.Reader(stdout)
+	activity := newActivityReader(stdout)
+	stdoutReader := io.Reader(activity)
 	if stdoutLogger != nil {
-		stdoutReader = io.TeeReader(stdout, stdoutLogger)
+		stdoutReader = io.TeeReader(activity, stdoutLogger)
 	}
 
 	// Start parse goroutine BEFORE starting the command to avoid race condition
@@ -1121,6 +1190,16 @@ func runCodexTaskWithContext(parentCtx context.Context, taskSpec TaskSpec, backe
 	go func() {
 		if isAntigravityBackend {
 			firstText := true
+			sessionEnded := false
+			endSession := func() {
+				if sessionEnded {
+					return
+				}
+				sessionEnded = true
+				if globalWebServer != nil && webSessionID != "" {
+					globalWebServer.EndSession(webSessionID, cfg.Backend)
+				}
+			}
 			msg, tid, failure := parseAntigravityStream(stdoutReader, agyStreamHandlers{
 				onSession: onSessionStartedCallback,
 				onText: func(text string) {
@@ -1136,19 +1215,25 @@ func runCodexTaskWithContext(parentCtx context.Context, taskSpec TaskSpec, backe
 					}
 				},
 				onLine: onProgressCallback,
+				onComplete: func() {
+					select {
+					case completeSeen <- struct{}{}:
+					default:
+					}
+					endSession()
+				},
 			})
 			select {
 			case completeSeen <- struct{}{}:
 			default:
 			}
-			if globalWebServer != nil && webSessionID != "" {
-				globalWebServer.EndSession(webSessionID, cfg.Backend)
-			}
+			endSession()
 			parseCh <- parseResult{message: msg, threadID: tid, failure: failure}
 			return
 		}
 
-		msg, tid := parseJSONStreamInternalWithContent(stdoutReader, logWarnFn, logInfoFn, func() {
+		var failure string
+		msg, tid := parseJSONStreamWithFailure(stdoutReader, logWarnFn, logInfoFn, func() {
 			select {
 			case messageSeen <- struct{}{}:
 			default:
@@ -1162,12 +1247,14 @@ func runCodexTaskWithContext(parentCtx context.Context, taskSpec TaskSpec, backe
 			if globalWebServer != nil && webSessionID != "" {
 				globalWebServer.EndSession(webSessionID, cfg.Backend)
 			}
-		}, onContentCallback, onProgressCallback, onSessionStartedCallback)
+		}, onContentCallback, onProgressCallback, onSessionStartedCallback, func(reason string) {
+			failure = reason
+		})
 		select {
 		case completeSeen <- struct{}{}:
 		default:
 		}
-		parseCh <- parseResult{message: msg, threadID: tid}
+		parseCh <- parseResult{message: msg, threadID: tid, failure: failure}
 	}()
 
 	logInfoFn(fmt.Sprintf("Starting %s with args: %s %s...", commandName, commandName, strings.Join(codexArgs[:min(5, len(codexArgs))], " ")))
@@ -1185,6 +1272,8 @@ func runCodexTaskWithContext(parentCtx context.Context, taskSpec TaskSpec, backe
 		result.Error = attachStderr("failed to start " + commandName + ": " + err.Error())
 		return result
 	}
+
+	activity.touch()
 
 	logInfoFn(fmt.Sprintf("Starting %s with PID: %d", commandName, cmd.Process().Pid()))
 	if logger != nil {
@@ -1217,24 +1306,71 @@ func runCodexTaskWithContext(parentCtx context.Context, taskSpec TaskSpec, backe
 		// This handles Windows edge case where child processes hold stdout handles
 		fallbackExitTimer   *time.Timer
 		fallbackExitTimerCh <-chan time.Time
+
+		stalled      bool
+		stalledAfter time.Duration
+		stallTicker  *time.Ticker
+		stallTickCh  <-chan time.Time
 	)
+
+	stallTimeout := stallTimeoutFn()
+	stallMaxSilent := stallMaxSilentFn()
+	stallGrace := stallMaxSilent > stallTimeout
+	stallWindow := stallCPUWindow(stallTimeout)
+	var (
+		silentSince       int64
+		idleWarned        bool
+		baselineAttempted bool
+		haveBaseline      bool
+		cpuBaseline       time.Duration
+		nextStallCheck    time.Duration
+	)
+	if stallTimeout > 0 {
+		stallTicker = time.NewTicker(stallTickInterval(stallTimeout))
+		stallTickCh = stallTicker.C
+		defer stallTicker.Stop()
+	}
+	stopStallTicker := func() {
+		if stallTicker != nil {
+			stallTicker.Stop()
+		}
+		stallTickCh = nil
+	}
+	cmdPID := func() int {
+		if proc := cmd.Process(); proc != nil {
+			return proc.Pid()
+		}
+		return 0
+	}
+
+	ctxDone := ctx.Done()
 
 waitLoop:
 	for {
 		select {
 		case waitErr = <-waitCh:
 			break waitLoop
-		case <-ctx.Done():
+		case <-ctxDone:
 			ctxCancelled = true
+			ctxDone = nil
 			logErrorFn(cancelReason(commandName, ctx))
+			// Don't block on waitCh: a grandchild holding stdout/stderr open can
+			// keep cmd.Wait from returning. Close stdout and terminate once
+			// (unless a stall or post-message teardown already did), then let
+			// waitCh or the fallback exit timer end the loop.
 			if !terminated {
+				closeWithReason(stdout, stdoutCloseReasonCtx)
+				terminated = true
 				if timer := terminateCommandFn(cmd); timer != nil {
 					forceKillTimer = timer
-					terminated = true
 				}
 			}
-			waitErr = <-waitCh
-			break waitLoop
+			if fallbackExitTimer == nil {
+				fallbackDelay := time.Duration(forceKillDelay.Load()+2) * time.Second
+				fallbackExitTimer = time.NewTimer(fallbackDelay)
+				fallbackExitTimerCh = fallbackExitTimer.C
+				logWarnFn(fmt.Sprintf("Fallback exit timer started: %v", fallbackDelay))
+			}
 		case <-messageTimerCh:
 			forcedAfterComplete = true
 			messageTimerCh = nil
@@ -1265,8 +1401,68 @@ waitLoop:
 			logWarnFn("Fallback exit timer fired: forcing loop exit (waitCh blocked)")
 			forcedAfterComplete = true
 			break waitLoop
+		case now := <-stallTickCh:
+			last := activity.lastActivity()
+			if last != silentSince {
+				silentSince = last
+				idleWarned = false
+				baselineAttempted = false
+				haveBaseline = false
+				nextStallCheck = stallTimeout
+			}
+			idle := activity.idleAt(now)
+			if !idleWarned && idle >= stallTimeout/2 {
+				idleWarned = true
+				if onProgressCallback != nil {
+					onProgressCallback(fmt.Sprintf("[PROGRESS] idle seconds=%d", int(idle/time.Second)))
+				}
+			}
+			if stallGrace && !baselineAttempted && idle >= stallTimeout-stallWindow {
+				baselineAttempted = true
+				if cpu, ok := descendantCPUTimeFn(cmdPID()); ok {
+					cpuBaseline = cpu
+					haveBaseline = true
+				}
+			}
+			if idle < nextStallCheck || ctx.Err() != nil {
+				continue
+			}
+			if stallGrace && haveBaseline && idle < stallMaxSilent {
+				if cpu, ok := descendantCPUTimeFn(cmdPID()); ok {
+					if cpu < cpuBaseline {
+						cpuBaseline = cpu
+					}
+					if cpu-cpuBaseline >= stallCPUGraceMin {
+						logInfoFn(fmt.Sprintf("%s silent for %ds but descendants are using CPU; extending stall check", commandName, int(idle/time.Second)))
+						cpuBaseline = cpu
+						nextStallCheck = idle + stallWindow
+						if nextStallCheck > stallMaxSilent {
+							nextStallCheck = stallMaxSilent
+						}
+						continue
+					}
+				}
+			}
+			stalled = true
+			stalledAfter = idle
+			stopStallTicker()
+			logWarnFn(fmt.Sprintf("%s produced no output for %ds; terminating stalled backend", commandName, int(idle/time.Second)))
+			closeWithReason(stdout, "stall")
+			if !terminated {
+				terminated = true
+				if timer := terminateCommandFn(cmd); timer != nil {
+					forceKillTimer = timer
+				}
+			}
+			if fallbackExitTimer == nil {
+				fallbackDelay := time.Duration(forceKillDelay.Load()+2) * time.Second
+				fallbackExitTimer = time.NewTimer(fallbackDelay)
+				fallbackExitTimerCh = fallbackExitTimer.C
+				logWarnFn(fmt.Sprintf("Fallback exit timer started: %v", fallbackDelay))
+			}
 		case <-completeSeen:
 			completeSeenObserved = true
+			stopStallTicker()
 			if messageTimer != nil {
 				continue
 			}
@@ -1329,6 +1525,10 @@ waitLoop:
 		}
 	}
 
+	if parsed.threadID != "" {
+		result.SessionID = parsed.threadID
+	}
+
 	if ctxErr := ctx.Err(); ctxErr != nil {
 		if errors.Is(ctxErr, context.DeadlineExceeded) {
 			result.ExitCode = 124
@@ -1340,10 +1540,45 @@ waitLoop:
 		return result
 	}
 
+	failureReason := func() string {
+		if strings.HasPrefix(parsed.failure, "INCOMPLETE:") {
+			return parsed.failure
+		}
+		return fmt.Sprintf("%s failed: %s", commandName, parsed.failure)
+	}
+
+	if stalled {
+		// A failure the backend reported before going silent is the real
+		// outcome; resuming that conversation would not help.
+		if parsed.failure != "" && parsed.failure != claudeIncompleteReason {
+			reason := failureReason()
+			logErrorFn(reason + " (backend then went silent)")
+			result.ExitCode = 1
+			result.Error = attachStderr(reason)
+			return result
+		}
+		msg := fmt.Sprintf("STALLED: %s produced no output for %ds", commandName, int(stalledAfter/time.Second))
+		logErrorFn(msg)
+		result.ExitCode = exitCodeStall
+		result.Error = attachStderr(msg)
+		return result
+	}
+
 	if waitErr != nil {
-		if forcedAfterComplete && parsed.message != "" {
+		if forcedAfterComplete && parsed.message != "" && parsed.failure == "" {
 			logWarnFn(fmt.Sprintf("%s terminated after delivering output", commandName))
 		} else {
+			if parsed.failure != "" {
+				code := 1
+				if exitErr, ok := waitErr.(*exec.ExitError); ok && exitErr.ExitCode() > 0 {
+					code = exitErr.ExitCode()
+				}
+				reason := failureReason()
+				logErrorFn(fmt.Sprintf("%s (exit status %d)", reason, code))
+				result.ExitCode = code
+				result.Error = attachStderr(reason)
+				return result
+			}
 			if exitErr, ok := waitErr.(*exec.ExitError); ok {
 				code := exitErr.ExitCode()
 				logErrorFn(fmt.Sprintf("%s exited with status %d", commandName, code))
@@ -1366,7 +1601,7 @@ waitLoop:
 	if message == "" {
 		reason := fmt.Sprintf("%s completed without agent_message output", commandName)
 		if parsed.failure != "" {
-			reason = fmt.Sprintf("%s failed: %s", commandName, parsed.failure)
+			reason = failureReason()
 		}
 		logErrorFn(reason)
 		result.ExitCode = 1
@@ -1383,7 +1618,9 @@ waitLoop:
 
 	result.ExitCode = 0
 	result.Message = message
-	result.SessionID = threadID
+	if threadID != "" {
+		result.SessionID = threadID
+	}
 	if result.LogPath == "" && injectedLogger != nil {
 		result.LogPath = injectedLogger.Path()
 	}

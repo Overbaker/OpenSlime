@@ -79,9 +79,12 @@ type UnifiedEvent struct {
 	Item     json.RawMessage `json:"item,omitempty"` // Lazy parse
 
 	// Claude-specific fields
-	Subtype   string `json:"subtype,omitempty"`
-	SessionID string `json:"session_id,omitempty"`
-	Result    string `json:"result,omitempty"`
+	Subtype       string          `json:"subtype,omitempty"`
+	SessionID     string          `json:"session_id,omitempty"`
+	Result        string          `json:"result,omitempty"`
+	Message       json.RawMessage `json:"message,omitempty"`
+	IsError       bool            `json:"is_error,omitempty"`
+	RateLimitInfo json.RawMessage `json:"rate_limit_info,omitempty"`
 
 	// Gemini-specific fields
 	// Gemini CLI uses camelCase "sessionId" instead of snake_case "session_id"
@@ -142,6 +145,36 @@ func parseJSONStreamInternal(r io.Reader, warnFn func(string), infoFn func(strin
 }
 
 func parseJSONStreamInternalWithContent(r io.Reader, warnFn func(string), infoFn func(string), onMessage func(), onComplete func(), onContent func(content, contentType string), onProgress func(line string), onSessionStarted func(id string)) (message, threadID string) {
+	return parseJSONStreamWithFailure(r, warnFn, infoFn, onMessage, onComplete, onContent, onProgress, onSessionStarted, nil)
+}
+
+// claudeContentBlock is one entry of a claude assistant message's content array.
+type claudeContentBlock struct {
+	Type string `json:"type"`
+	Name string `json:"name,omitempty"`
+	Text string `json:"text,omitempty"`
+}
+
+// claudeResultIsError reports whether a claude result event describes a failure.
+func claudeResultIsError(event UnifiedEvent) bool {
+	return event.IsError || (event.Subtype != "" && event.Subtype != "success")
+}
+
+// claudeFailureReason names a failed claude result: the subtype unless it is
+// "success", else the result text as one line of at most 200 runes, else "error".
+func claudeFailureReason(event UnifiedEvent) string {
+	if event.Subtype != "" && event.Subtype != "success" {
+		return event.Subtype
+	}
+	if text := safeProgressSnippet(event.Result, 200); text != "" {
+		return text
+	}
+	return "error"
+}
+
+const claudeIncompleteReason = "INCOMPLETE: claude exited without a result event"
+
+func parseJSONStreamWithFailure(r io.Reader, warnFn func(string), infoFn func(string), onMessage func(), onComplete func(), onContent func(content, contentType string), onProgress func(line string), onSessionStarted func(id string), onFailure func(reason string)) (message, threadID string) {
 	reader := bufio.NewReaderSize(r, jsonLineReaderSize)
 
 	if warnFn == nil {
@@ -171,6 +204,8 @@ func parseJSONStreamInternalWithContent(r io.Reader, warnFn func(string), infoFn
 	}
 
 	totalEvents := 0
+	claudeSeen := false
+	claudeResultSeen := false
 
 	var (
 		codexMessage   string
@@ -236,13 +271,14 @@ func parseJSONStreamInternalWithContent(r io.Reader, warnFn func(string), infoFn
 				isCodex = true
 			}
 		}
-		isClaude := event.Subtype != "" || event.Result != ""
-		if !isClaude && event.Type == "result" && event.GetSessionID() != "" && event.Status == "" {
-			isClaude = true
-		}
 		// Opencode is the most specific shape: its own sessionID key plus a
 		// nested part object.
 		isOpencode := event.OpencodeSessionID != "" && len(event.Part) > 0
+		isClaude := !isCodex && !isOpencode &&
+			(event.Subtype != "" || event.Result != "" ||
+				((event.Type == "assistant" || event.Type == "user") && (len(event.Message) > 0 || event.GetSessionID() != "")) ||
+				event.Type == "tool_progress" || event.Type == "rate_limit_event" ||
+				(event.Type == "result" && event.Status == "" && (event.GetSessionID() != "" || event.IsError)))
 
 		// Kimi must be classified before Gemini: both carry "role"/"content",
 		// but Gemini always stamps a "type" on its events while kimi's chat
@@ -373,7 +409,55 @@ func parseJSONStreamInternalWithContent(r io.Reader, warnFn func(string), infoFn
 				threadID = event.GetSessionID()
 			}
 
+			claudeSeen = true
 			infoFn(fmt.Sprintf("Parsed Claude event #%d type=%s subtype=%s result_len=%d", totalEvents, event.Type, event.Subtype, len(event.Result)))
+
+			switch event.Type {
+			case "system":
+				if event.Subtype == "init" {
+					emitProgress(formatProgressLine("session_started", map[string]string{"id": event.GetSessionID()}))
+				}
+			case "assistant":
+				if onProgress != nil && len(event.Message) > 0 {
+					var msg struct {
+						Content []claudeContentBlock `json:"content"`
+					}
+					if err := json.Unmarshal(event.Message, &msg); err == nil {
+						for _, block := range msg.Content {
+							switch block.Type {
+							case "tool_use":
+								emitProgress(formatProgressLine("tool_use", map[string]string{"tool": block.Name}))
+							case "text":
+								if strings.TrimSpace(block.Text) != "" {
+									emitProgress(formatProgressLine("message", map[string]string{"text": strconv.Quote(safeProgressSnippet(block.Text, 120))}))
+								}
+							}
+						}
+					}
+				}
+			case "rate_limit_event":
+				if onProgress != nil && len(event.RateLimitInfo) > 0 {
+					var info struct {
+						Status string `json:"status"`
+					}
+					if err := json.Unmarshal(event.RateLimitInfo, &info); err == nil && info.Status != "" && info.Status != "allowed" {
+						emitProgress(formatProgressLine("rate_limit", map[string]string{"status": info.Status}))
+					}
+				}
+			case "result":
+				claudeResultSeen = true
+				emitProgress(formatProgressLine("session_completed", map[string]string{"total_events": strconv.Itoa(totalEvents)}))
+				if claudeResultIsError(event) {
+					// The result text of a failed turn is an error message, not the
+					// answer, and it voids any answer from an earlier result.
+					claudeMessage = ""
+					if onFailure != nil {
+						onFailure(claudeFailureReason(event))
+					}
+					notifyComplete()
+					continue
+				}
+			}
 
 			if event.Result != "" {
 				claudeMessage = event.Result
@@ -524,6 +608,10 @@ func parseJSONStreamInternalWithContent(r io.Reader, warnFn func(string), infoFn
 		message = codexMessage
 	}
 
+	if claudeSeen && !claudeResultSeen && message == "" && onFailure != nil {
+		onFailure(claudeIncompleteReason)
+	}
+
 	infoFn(fmt.Sprintf("parseJSONStream completed: events=%d, message_len=%d, thread_id_found=%t", totalEvents, len(message), threadID != ""))
 	return message, threadID
 }
@@ -533,7 +621,7 @@ func formatProgressLine(event string, fields map[string]string) string {
 	if fields == nil {
 		return strings.Join(parts, " ")
 	}
-	for _, key := range []string{"id", "text", "cmd", "exit", "total_events"} {
+	for _, key := range []string{"id", "tool", "status", "text", "cmd", "exit", "total_events"} {
 		if value, ok := fields[key]; ok && strings.TrimSpace(value) != "" {
 			parts = append(parts, key+"="+value)
 		}

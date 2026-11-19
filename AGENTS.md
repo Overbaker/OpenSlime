@@ -11,7 +11,11 @@ What the installation writes:
 - `~/.claude/rules/ccg-codegraph.md`
 - `~/.claude/bin/codeagent-wrapper`
 - `~/.claude/bin/osm` (decision-ledger launcher; runs this checkout's `bin/ccg.mjs` with the installing Node)
-- Permission allow entry for `codeagent-wrapper` in `~/.claude/settings.json`
+- Permission allow entry for `codeagent-wrapper` in `~/.claude/settings.json`, plus wrapper env defaults (`CODEAGENT_LITE_MODE`, `CODEAGENT_MAX_PARALLEL_WORKERS`, `CODEX_TIMEOUT=3300`) where unset
+
+The wrapper ends a backend call that writes nothing for 600 s (`CODEAGENT_STALL_TIMEOUT`, `0` disables) with exit code 125 and `STALLED:`; the `/osm:*` commands resume the returned `SESSION_ID` once.
+
+Commits and pull request descriptions made by `/osm:impl` at the user's request end with a `via OpenSlime` line and `OSM-Change`/`OSM-Specs`/`OSM-Writers`/`OSM-Reviewers` trailers, never written into code; `--no-trace` leaves them out.
 
 The decision ledger lives in `~/.claude/osm-ledger/`. It is created on the first recorded stage, and init, update and uninstall never modify or delete it. `osm ledger render --svg` writes only under `~/.claude/osm-ledger/renders/` unless given `--out`; `summary`, `position` and `render` never write events.
 

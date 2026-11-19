@@ -106,6 +106,7 @@ description: 'codex/antigravity 按任务写代码，Claude 监控审查 + 归�
 
    - 后台调用完成时会自动通知，不要轮询。后端模型常需 5-15 分钟，timeout 上限 60 分钟。到时仍未完成：报告用户并询问是否继续等待，不要自行杀掉后台任务。
    - 某个模型失败：重试一次；仍失败就用另一方的结果继续，并在阶段报告里把置信度下调一档。
+   - 输出含 `STALLED:` 或 `INCOMPLETE:`（wrapper 判定后端停滞或中断）：用返回的 `SESSION_ID` 执行一次 `resume <SESSION_ID>` 并说"继续"；没有 SESSION_ID 就重新发起一次。这算该模型的那一次重试。
 
    - Use a fresh session (no `resume`): the writer reviewing its own work misses the same things twice.
    - With `--compare explore`, cross-check both reviewers' findings per candidate, then pick the candidate that passes VERIFY with fewer Critical findings (smaller diff on a tie). Only then bring the kept result into the main tree.
@@ -114,6 +115,16 @@ description: 'codex/antigravity 按任务写代码，Claude 监控审查 + 归�
 7. **Update Task Status**
    - Mark completed task in `tasks.md`: `- [x] Task description`
    - Commit only if the user asked for it.
+   - When you do commit, end the message with the block below unless `$ARGUMENTS` contains `--no-trace`. Fill only what you know from this session; drop a line you cannot fill. Keep attribution lines your own instructions require, and put all trailers in one final block with no blank line inside it.
+     ```
+     via [OpenSlime](https://github.com/Overbaker/OpenSlime)
+
+     OSM-Change: <change id>
+     OSM-Specs: <capability names under the change's specs/, comma-separated>
+     OSM-Writers: <backends that wrote the committed code; add claude if you fixed lines yourself>
+     OSM-Reviewers: <backends whose review finished> (Critical <open count>)
+     ```
+   - If you open a pull request for this change, end its description with the same block unless `$ARGUMENTS` contains `--no-trace`. Never write these lines, or any generated-by note, into source files, comments or docs.
 
 
 8. **Archive on Completion**

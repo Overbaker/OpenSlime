@@ -9,7 +9,44 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
+
+const (
+	defaultStallTimeout   = 600 * time.Second
+	defaultStallMaxSilent = 900 * time.Second
+	maxStallSeconds       = 86400 * 365
+)
+
+var (
+	stallTimeoutFn   = resolveStallTimeout
+	stallMaxSilentFn = resolveStallMaxSilent
+)
+
+func resolveStallTimeout() time.Duration {
+	return resolveStallSeconds("CODEAGENT_STALL_TIMEOUT", defaultStallTimeout)
+}
+
+func resolveStallMaxSilent() time.Duration {
+	return resolveStallSeconds("CODEAGENT_STALL_MAX_SILENT", defaultStallMaxSilent)
+}
+
+func resolveStallSeconds(key string, fallback time.Duration) time.Duration {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return fallback
+	}
+	switch strings.ToLower(raw) {
+	case "0", "off", "false":
+		return 0
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil || value < 0 || value > maxStallSeconds {
+		logWarn(fmt.Sprintf("Invalid %s=%q, falling back to %ds", key, raw, int(fallback/time.Second)))
+		return fallback
+	}
+	return time.Duration(value) * time.Second
+}
 
 func resolveTimeout() int {
 	raw := os.Getenv("CODEX_TIMEOUT")

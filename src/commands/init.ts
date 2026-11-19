@@ -22,10 +22,13 @@ import { getSkillCatalog, installedNames, removeSkills, resolveSkillPaths, SKILL
  *   post-message delay instead of 5s.
  * - MAX_PARALLEL_WORKERS: caps one `--parallel` batch; each backend process
  *   (agy, codex) uses hundreds of MB.
+ * - CODEX_TIMEOUT: 3300s, so the wrapper exits with its SESSION_ID before the
+ *   3600s background Bash timeout kills it.
  */
 export const WRAPPER_ENV_DEFAULTS: Record<string, string> = {
   CODEAGENT_LITE_MODE: 'true',
   CODEAGENT_MAX_PARALLEL_WORKERS: '3',
+  CODEX_TIMEOUT: '3300',
 }
 
 /**

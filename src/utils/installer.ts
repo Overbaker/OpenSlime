@@ -94,7 +94,7 @@ export type { SkillMeta } from './skill-registry'
  * The `-osm.N` suffix keeps an upstream binary of the same base version from
  * passing the check.
  */
-const EXPECTED_BINARY_VERSION = '5.16.0-osm.1'
+const EXPECTED_BINARY_VERSION = '5.16.0-osm.2'
 
 // ═══════════════════════════════════════════════════════
 // Install context — shared across sub-functions

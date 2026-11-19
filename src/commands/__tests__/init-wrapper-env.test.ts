@@ -31,7 +31,16 @@ describe('installHook wrapper env defaults', () => {
     expect(settings.env).toEqual({
       CODEAGENT_LITE_MODE: 'false',
       CODEAGENT_MAX_PARALLEL_WORKERS: '3',
+      CODEX_TIMEOUT: '3300',
       OTHER: '1',
     })
+  })
+
+  it('adds CODEX_TIMEOUT=3300 and keeps an existing value', async () => {
+    expect(WRAPPER_ENV_DEFAULTS.CODEX_TIMEOUT).toBe('3300')
+    await fs.writeJSON(settingsPath, { env: { CODEX_TIMEOUT: '7200' } })
+    await installHook(settingsPath)
+    const settings = await fs.readJSON(settingsPath)
+    expect(settings.env.CODEX_TIMEOUT).toBe('7200')
   })
 })

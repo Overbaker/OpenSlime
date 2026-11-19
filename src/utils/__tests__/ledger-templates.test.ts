@@ -44,11 +44,27 @@ describe('installed ledger prompts', () => {
   it('installs osm-ledger.md next to osm-report.md with ~/.claude rewritten', async () => {
     const installDir = join(tmpdir(), `osm-tpl-${Date.now()}`, '.claude')
     await fs.ensureDir(join(installDir, 'bin'))
-    await fs.writeFile(join(installDir, 'bin', 'codeagent-wrapper'), '#!/usr/bin/env node\nconsole.log("codeagent-wrapper version 5.16.0-osm.1")\n', { mode: 0o755 })
+    await fs.writeFile(join(installDir, 'bin', 'codeagent-wrapper'), '#!/usr/bin/env node\nconsole.log("codeagent-wrapper version 5.16.0-osm.2")\n', { mode: 0o755 })
     await installWorkflows(getAllCommandIds(), installDir, true, { mcpProvider: 'skip' })
     const installed = readFileSync(join(installDir, '.ccg', 'prompts', 'claude', 'osm-ledger.md'), 'utf8')
     expect(installed).toContain(`${installDir}/bin/osm ledger lessons query`)
-    expect(readFileSync(join(installDir, 'commands', 'osm', 'impl.md'), 'utf8')).toContain(`${installDir}/.ccg/prompts/claude/osm-ledger.md`)
+    const impl = readFileSync(join(installDir, 'commands', 'osm', 'impl.md'), 'utf8')
+    expect(impl).toContain(`${installDir}/.ccg/prompts/claude/osm-ledger.md`)
+    for (const s of ['OSM-Change:', 'OSM-Writers:', '--no-trace', 'https://github.com/Overbaker/OpenSlime', 'pull request']) expect(impl).toContain(s)
+    expect(impl).toMatch(/open a pull request[^\n]*--no-trace/)
+  }, 60_000)
+
+  it('installs the same STALLED: rule line exactly once in research, plan, impl and review', async () => {
+    const installDir = join(tmpdir(), `osm-stall-${Date.now()}`, '.claude')
+    await fs.ensureDir(join(installDir, 'bin'))
+    await fs.writeFile(join(installDir, 'bin', 'codeagent-wrapper'), '#!/usr/bin/env node\nconsole.log("codeagent-wrapper version 5.16.0-osm.2")\n', { mode: 0o755 })
+    await installWorkflows(getAllCommandIds(), installDir, true, { mcpProvider: 'skip' })
+    const lines = ['research', 'plan', 'impl', 'review'].map((c) => {
+      const hits = readFileSync(join(installDir, 'commands', 'osm', `${c}.md`), 'utf8').split('\n').filter(l => l.includes('STALLED:'))
+      expect(hits, c).toHaveLength(1)
+      return hits[0]
+    })
+    expect(new Set(lines).size).toBe(1)
   }, 60_000)
 })
 
