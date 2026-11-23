@@ -3,7 +3,7 @@
 > [根目录](../CLAUDE.md) > **codeagent-wrapper**
 
 **Last Updated**: 2026-08-29
-**Binary Version**: v5.16.0-osm.2
+**Binary Version**: v5.16.0-osm.3
 **Go Version**: 1.21+（`go.mod:1`）
 
 ---
@@ -309,8 +309,8 @@ bash build-all.sh
 
 | 文件 | 位置 | 当前值 |
 |------|------|--------|
-| `codeagent-wrapper/main.go` | `version = "..."` （`main.go:17`） | `5.16.0-osm.2` |
-| `src/utils/installer.ts` | `EXPECTED_BINARY_VERSION = '...'` | `5.16.0-osm.2` |
+| `codeagent-wrapper/main.go` | `version = "..."` （`main.go:17`） | `5.16.0-osm.3` |
+| `src/utils/installer.ts` | `EXPECTED_BINARY_VERSION = '...'` | `5.16.0-osm.3` |
 
 两边不一致的后果：用户运行 `npx ccg-workflow update` 时无法触发 binary 重新下载，继续使用旧版 binary。
 

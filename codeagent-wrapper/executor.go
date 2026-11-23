@@ -1214,7 +1214,7 @@ func runCodexTaskWithContext(parentCtx context.Context, taskSpec TaskSpec, backe
 						onContentCallback(text, "text")
 					}
 				},
-				onLine: onProgressCallback,
+				onLine: withProgressPrefix(onProgressCallback),
 				onComplete: func() {
 					select {
 					case completeSeen <- struct{}{}:

@@ -4,6 +4,7 @@
 
 - Slim install: no hooks or routing rules, `/osm:init|research|plan|impl|review`, cross-checked codex + antigravity, Fix Rules, `--compare`, stage reports. See FORK.md.
 - Wrapper `5.16.0-osm.2`: a backend silent on stdout for `CODEAGENT_STALL_TIMEOUT` seconds (default 600; up to `CODEAGENT_STALL_MAX_SILENT`, default 900, while descendants use CPU) is killed with exit code 125 and `STALLED:`; `SESSION_ID` is printed on every exit; claude runs show `[PROGRESS]` lines and report `INCOMPLETE:` or `claude failed: <subtype>`; `--parallel` prefers exit 125, then 124. The `/osm:*` templates resume a stalled call once, and the installer (`osm init`) adds `CODEX_TIMEOUT=3300` where unset.
+- Wrapper `5.16.0-osm.3`: antigravity progress lines carry the `[PROGRESS]` prefix like the other backends.
 - `/osm:impl` commits and pull request descriptions end with a `via [OpenSlime](https://github.com/Overbaker/OpenSlime)` line and `OSM-Change`, `OSM-Specs`, `OSM-Writers`, `OSM-Reviewers` trailers, never written into code; `--no-trace` leaves them out.
 - Everything below is upstream ccg-workflow history.
 

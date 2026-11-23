@@ -7,7 +7,7 @@ OpenSlime is a slim fork of ccg-workflow. It installs `/osm:*` commands, role pr
 - `templates/commands/` — the five `/osm:*` command templates. `{{BACKEND_PRIMARY}}`-style placeholders are filled at install time (`utils/installer-template.ts`).
 - `templates/prompts/<backend>/` — role prompts read by the wrapper via `ROLE_FILE:`; `prompts/claude/osm-report.md` is the stage-report spec.
 - `templates/skills/`, `templates/output-styles/`, `templates/rules/` — copied as-is.
-- `codeagent-wrapper/` — Go wrapper, forked from upstream (version `5.16.0-osm.2`); the installer downloads the fork's own binaries from the `preset` release and checks `EXPECTED_BINARY_VERSION` in `src/utils/installer.ts`.
+- `codeagent-wrapper/` — Go wrapper, forked from upstream (version `5.16.0-osm.3`); the installer downloads the fork's own binaries from the `preset` release and checks `EXPECTED_BINARY_VERSION` in `src/utils/installer.ts`.
 
 ## Rules
 - Nothing may be injected per turn: no hooks, no always-on rules beyond `rules/ccg-codegraph.md`.

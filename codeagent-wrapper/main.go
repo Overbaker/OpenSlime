@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	version               = "5.16.0-osm.2"
+	version               = "5.16.0-osm.3"
 	defaultWorkdir        = "."
 	defaultTimeout        = 7200 // seconds (2 hours)
 	defaultCoverageTarget = 90.0

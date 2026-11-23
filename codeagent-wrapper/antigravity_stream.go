@@ -144,3 +144,12 @@ func agyFailure(status, errText string) string {
 	}
 	return ""
 }
+
+// withProgressPrefix marks agy text lines like the other backends' progress
+// (parser.go), so `[PROGRESS]` filters see them. nil stays nil.
+func withProgressPrefix(onProgress func(string)) func(string) {
+	if onProgress == nil {
+		return nil
+	}
+	return func(line string) { onProgress("[PROGRESS] " + line) }
+}

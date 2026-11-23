@@ -165,3 +165,18 @@ func TestParseAntigravityStream_KeepsStrayLines(t *testing.T) {
 		t.Fatalf("got (%q, %q), want the lines and no id", msg, id)
 	}
 }
+
+func TestWithProgressPrefix(t *testing.T) {
+	if withProgressPrefix(nil) != nil {
+		t.Fatalf("nil callback must stay nil")
+	}
+	var got []string
+	in := `{"event":"step_update","step_update":{"step_type":"agent_response","text_delta":"one\ntwo\n"}}
+`
+	_, _, _ = parseAntigravityStream(strings.NewReader(in), agyStreamHandlers{
+		onLine: withProgressPrefix(func(s string) { got = append(got, s) }),
+	})
+	if strings.Join(got, "|") != "[PROGRESS] one|[PROGRESS] two" {
+		t.Fatalf("progress lines = %q", got)
+	}
+}
