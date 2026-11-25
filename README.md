@@ -14,7 +14,7 @@
   <img src="https://img.shields.io/badge/license-MIT-111111?style=flat-square" alt="MIT license">
 </p>
 
-<p align="center"><sub>English &middot; <a href="README.zh-CN.md">简体中文</a></sub></p>
+<p align="center"><sub>English &middot; <a href="README.zh-CN.md">简体中文</a> &middot; <a href="#install">Install</a> &middot; <a href="#five-commands">5 Commands</a> &middot; <a href="PRINCIPLES.md">Principles</a> &middot; <a href="CONTRIBUTING.md">Contribute</a> &middot; <a href="https://github.com/Overbaker/OpenSlime/discussions">Discussions</a></sub></p>
 
 ---
 
@@ -94,6 +94,9 @@ Manual steps: [AGENTS.md](AGENTS.md).
 
 ## Ledger reference
 
+<details>
+<summary><strong>CLI commands, statistical criteria, opt-out &amp; probe flags</strong></summary>
+
 - **Decision ledger.**
   - Each stage appends one line to `~/.claude/osm-ledger/`. Recorded: the confidence it stated, the decisions you made, probe results, and what later reviews found.
   - The ledger stays out of your repo, and uninstall keeps it.
@@ -114,6 +117,8 @@ Manual steps: [AGENTS.md](AGENTS.md).
 - **Opt out** with `~/.claude/bin/osm ledger off`, `OSM_LEDGER=0` or `--no-ledger`. Stages still finish, their confidence is unchanged, and lessons and probes are skipped.
 - **Probes need committed code.** A probe starts only when the tree is clean apart from `openspec/`; otherwise the skip is recorded as `dirty-base`.
 - **Flags.** `/osm:impl --compare` forces a lesson probe. `--compare explore` runs the old self-routing comparison, which is never credited to a lesson. `--no-probe` turns probes off.
+
+</details>
 
 ## Why it is small
 

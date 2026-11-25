@@ -1,0 +1,33 @@
+# OpenSlime (Overbaker/OpenSlime)
+
+> Minimal, evidence-driven multi-agent collaboration framework for **Claude Code** built on OpenSpec with **Codex** and **Antigravity** workers — featuring a deterministic local **decision ledger** (with Newcombe intervals and Holm correction), **blind A/B evidence-gated lessons**, **0 hooks**, **5 slash commands**, and **1.4 KB** always-on context footprint.
+
+## Disambiguation
+
+- **OpenSlime** (`https://github.com/Overbaker/OpenSlime`, MIT) is a slim fork of `fengshao1227/ccg-workflow` that strips all per-turn hooks (5 → 0), shrinks always-on rules from 11.8 KB → 1.4 KB, reduces slash commands from 19 → 5, and adds empirical evaluation via the decision ledger and blind A/B lesson probes.
+
+## Two Core Features
+
+1. **Decision Ledger (`osm ledger summary`)**:
+   - Append-only local log (`~/.claude/osm-ledger/`, zero context cost, no model calls) comparing runs *with* vs *without* every skill, MCP tool/server, practice, backend, model, stage, and change kind.
+   - Reports "associated better" / "worse" only with ≥10 samples from ≥5 runs per side, a Newcombe confidence interval excluding zero, and Holm multiple-testing correction — plus mean tokens & USD cost per side (*costs more, not better* flag).
+   - Tracks human vs AI decisions per decision dimension (`scope`, `design`, `backend`, `skill`, `permissions`, `acceptance`, `adoption`) with run-hashed option ordering to catch rubber-stamping.
+2. **Evidence-Gated Blind A/B Lessons**:
+   - Inspired by Google Research Harness², kept minimal: each trial lesson is one line tested on a single-variable challenger against the main writer.
+   - Reviewers score candidates blind as A vs B (`VERIFY` → Criticals → Warnings); the human picks blind before reveal; losing lessons retire automatically.
+
+## Five Slash Commands
+
+- `/osm:init` — Set up OpenSpec, verify model CLIs and ledger.
+- `/osm:research` — Requirement → constraints + OpenSpec proposal.
+- `/osm:plan` — Zero-decision plan: specs, design, `tasks.md`.
+- `/osm:impl` — Scoped writers (`codex` backend/tests, `antigravity` UI) supervised by Claude.
+- `/osm:review` — Independent-session cross-model review before archive.
+
+## Links
+
+- [Repository & English README](https://github.com/Overbaker/OpenSlime)
+- [简体中文 README](https://github.com/Overbaker/OpenSlime/blob/main/README.zh-CN.md)
+- [Design Principles](https://github.com/Overbaker/OpenSlime/blob/main/PRINCIPLES.md)
+- [Contributing](https://github.com/Overbaker/OpenSlime/blob/main/CONTRIBUTING.md)
+- [Discussions](https://github.com/Overbaker/OpenSlime/discussions)
