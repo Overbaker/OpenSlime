@@ -93,6 +93,7 @@ Install OpenSlime from https://github.com/Overbaker/OpenSlime. Follow AGENTS.md 
 - **可追溯的提交和 pull request。** 你让 `/osm:impl` 提交或开 pull request 时，提交信息或 PR 描述末尾带一行 `via OpenSlime` 和 `OSM-Change`、`OSM-Specs`、`OSM-Writers`、`OSM-Reviewers` 这几个 trailer。它们不会写进代码、注释或文档。`/osm:impl --no-trace` 不加。
 - **始终交叉校验。** research、plan、review 都让 codex 和 antigravity 各自在新会话里独立完成，由 Claude 对比两者一致和分歧的地方。
 - **阶段报告。** 每次运行结束都在 `${TMPDIR:-/tmp}/osm-reports/` 生成一份报告，附带置信度（高/中/低，百分比）。
+- **可验证交付与 square² 门禁。** 每个任务冻结单行 `VERIFY`（`osm verify-guard` 拦截削弱测试），要求命令/退出码/tree-SHA 证据，将 `/osm:review` 与归档绑定到 `tree_sha`（附 `OSM-Reviewed` trailer），按 Correct 阶梯升级已确认问题，并在含 `.square2/` 的仓库按需加载 `osm-square2.md`。
 
 ## 账本细节
 

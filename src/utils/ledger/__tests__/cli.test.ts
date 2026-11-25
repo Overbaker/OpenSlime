@@ -347,3 +347,11 @@ describe('osm ledger render', () => {
     expect((await osm(['render', '--svg', '--out', foreign, '--theme', 'light'], null, { HOME: home })).code).toBe(2)
   }, 90_000)
 })
+
+it.each([Buffer.alloc(0), Buffer.from([0, 255, 128, 10, 13])])('P7: hash-report hashes the exact bytes', async (bytes) => {
+  const path = join(tmp(), 'gate report')
+  writeFileSync(path, bytes)
+  const result = await osm(['hash-report', path], null)
+  expect(result.code).toBe(0)
+  expect(result.stdout).toBe(`${createHash('sha256').update(bytes).digest('hex')}\n`)
+}, 30_000)

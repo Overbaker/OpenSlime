@@ -1,70 +1,61 @@
 # OpenSlime stage report (Claude)
 
-Write one at the end of every /osm:research, /osm:plan and /osm:review run, and one per phase of /osm:impl.
+Write after `/osm:research|plan|review` and each `/osm:impl` phase to `${TMPDIR:-/tmp}/osm-reports/<repo>/<change-id>/<stage>.md` (impl: `impl-<phase>.md`; use the phase identifier from tasks.md). Overwrite; never commit; show path + Confidence.
 
-Path: `${TMPDIR:-/tmp}/osm-reports/<repo-name>/<change-id>/<stage>.md` for research/plan/review; `${TMPDIR:-/tmp}/osm-reports/<repo-name>/<change-id>/impl-<phase>.md` for impl (use the phase identifier from tasks.md). Reports are temporary; overwrite the same stage or phase on re-run; never commit. Show the path and the Confidence line in chat.
-
-```markdown
+````markdown
 # <stage> — <change-id> — <date>
-Confidence: High | Medium | Low (NN%) — <one-line reason>
-Ledger: on (event <id>) | off | unavailable (<reason>)
+Confidence: High|Medium|Low (NN%) — <reason>
+Ledger: on (<id>) | off | unavailable (<reason>)
+Tree: <tree_sha> | Reviewed tree: <sha|n/a> | Critical open: <N|n/a>
+Gate: pass|fail|skipped (new N, baselined N, excepted N) | verify_sha256: <hex|map>
 
 ## Decision
-<what was decided or done, 1-3 lines>
+<1-3 lines>
 
 ## Models
-| Point | codex | antigravity | Claude call |
-|---|---|---|---|
-<only points that matter; mark agree / disagree; for impl add the comparison writer column if used>
+| Point | codex | antigravity | Claude |
+|-|-|-|-|
+<agree/disagree; +comparison col>
 
 ## Evidence
-- <commands run and results, files read, tests passed/failed>
+- <files, base_tree, commands>
+```text
+VERIFY <command>
+exit <n>  tree <sha7>  base <sha>
+<last ≤20 lines>
+```
 
-## Open risks / not checked
+## Risks / not checked
 - <max 5>
+````
+
+## Tree SHA
+Temp-index `tree_sha` (no-index safe, aborts on error/empty; or `~/.claude/bin/osm verify-guard --print-tree`):
+```bash
+tree_sha=$(set -e; idx=$(mktemp); trap 'rm -f "$idx"' EXIT; src=$(git rev-parse --git-path index)
+  if [ -f "$src" ]; then cp "$src" "$idx"; else rm -f "$idx"; fi
+  GIT_INDEX_FILE="$idx" git add -A && GIT_INDEX_FILE="$idx" git write-tree) && [ -n "$tree_sha" ] || exit 1
 ```
 
 ## Confidence
-Start at Medium (60%), then:
-- +15 each: both models agree on the key points; VERIFY or tests pass; no open Critical findings.
-- −15 each: the models disagree on a key point you resolved by judgement; a model failed and was skipped; something important was not checked; an ambiguity was assumed, not confirmed.
-Cap at 95%. High ≥ 80%, Low < 50%. When Low, say what would raise it.
+Start 60% (Medium): +15 each (agree; VERIFY/tests pass; 0 Criticals); −15 each (unresolved split; fail/skip; check skipped; assumed ambiguity). Cap 95%; High ≥80%, Low <50% (say what raises it).
 
-## Ledger
-The decision ledger (`~/.claude/bin/osm ledger`) keeps stage confidence, human decisions and what later happened. It lives in `~/.claude/osm-ledger/` and is never committed.
+## Ledger (`~/.claude/osm-ledger/`, never committed)
+1. **Run id.** `~/.claude/bin/osm ledger run-id` once; reuse on retries. `--no-ledger`/`"disabled"` → `Ledger: off`; error → `Ledger: unavailable (<reason>)`; skip ledger.
+2. **Human decisions.** Material `AskUserQuestion` → `human_decision`: `dimension` is one of `scope`, `design`, `backend`, `skill`, `permissions`, `acceptance` (lesson adoption: `adoption`); routine acks don't count. Recommend smallest (3 rounds w/ open Critical → track issue, don't archive; never id `recommended`). With rec: `~/.claude/bin/osm ledger position --run-id <run id> --decision-id <slug> --options <K>`, put at 0-based index, set `"position":"run-hash-v1"`. `options`: shown ids; `recommendation`/`initial_choice`: id|null; `final_position`: index.
+3. **Stage completed.** Freeze confidence; `operation_key`: `"report"` or `"report-<phase_id>"` + `phase_id`. Invocations: each model/subagent/skill (`accepted`/`rejected`/`unadjudicated`|null) + Claude (`role:"orchestrator"`). Optional: `model`, `mcp_tools` (`server:tool`), `practices` from `plan-first, tdd, pbt, repro-first, spec-read, callers-read, parallel-review, blind-review, worktree, typecheck, lint, small-commits`, `cost` `{"tokens":N,"usd":N}`, `failure` `timeout | quota | auth | region | crash | empty-output | bad-output | other` (fail/skip), `tree_sha`, `commit_sha`, `verify_sha256` (hex|`{task:hex}`), `gate` (`{result,exit_code?,new,baselined,excepted,square2_version,report_sha256}`; hash: `~/.claude/bin/osm ledger hash-report <path>`; `new`=len(`new_violations`), `baselined`=Σ `rules[*].baselined`, `excepted`=Σ `rules[*].excepted`; unknown ver: `exit_code` + null counts/hash), `ai_decisions` (0 if none; omit if not counted), `change_kind` (`feature | fix | refactor | docs | test | chore`). Gate outcomes: `"gate-impl-<phase>"`/`"gate-review"` (never `"outcome-impl-<phase>"`).
+4. Ledger off/errors never alter confidence (only `Ledger:`).
 
-1. **Run id.** At stage start, run `~/.claude/bin/osm ledger run-id` once. Use it as `run_id` for every event of this invocation, retries included.
-   - With `--no-ledger` in `$ARGUMENTS`, skip every ledger step and write `Ledger: off`.
-   - If it fails, skip every ledger step and write `Ledger: unavailable (<reason>)`.
-   - If append returns `{"status":"disabled"}`, write `Ledger: off` and skip the rest.
-2. **Human decisions.** After each material `AskUserQuestion` answer, append one `human_decision`. Material means its `dimension` is one of `scope`, `design`, `backend`, `skill`, `permissions`, `acceptance` (lesson adoption: `adoption`); routine acks don't count.
-   - Recommend the smallest option that keeps the goal; after 3 fix rounds with a Critical open, commit-and-track. Never use `recommended` as an id.
-   - With a recommendation, first run `~/.claude/bin/osm ledger position --run-id <run id> --decision-id <slug> --options <K>`, show it at that 0-based index, and set `"position":"run-hash-v1"`.
-   - `options`: the option ids, in the order they were shown.
-   - `recommendation`: the option marked Recommended, or null.
-   - `initial_choice`: the user's choice before your input, else null.
-   - `final_position`: the index of `final_choice` in `options`.
-3. **Stage completed.** At report time, freeze the confidence first, then append `stage_completed`. Use `operation_key: "report"`; for impl use `"report-<phase_id>"` and also set `phase_id`.
-   - Add one invocation per external model, subagent or skill call, with its accepted, rejected and unadjudicated finding counts (null if unknown).
-   - Add Claude's own usage as one invocation with `role: "orchestrator"`.
-   - Optional, never guessed: `model`; `mcp_tools` as `server:tool`; `practices` from `plan-first, tdd, pbt, repro-first, spec-read, callers-read, parallel-review, blind-review, worktree, typecheck, lint, small-commits`; `cost` `{"tokens":N,"usd":N}`.
-   - Failed or skipped call: `failure` `timeout | quota | auth | region | crash | empty-output | bad-output | other`.
-   - `ai_decisions`: per dimension, material decisions you made without asking (0 if none; omit if not counted). `change_kind`: `feature | fix | refactor | docs | test | chore`.
-4. **The ledger never changes the confidence.** A missing CLI, an error exit or `Ledger: off` only changes the `Ledger:` line.
-
-Append through a quoted heredoc. Exit 0 means the receipt is `appended`, `duplicate` or `disabled`.
-
+Append via heredoc (exit 0: `appended`|`duplicate`|`disabled`):
 ```bash
 ~/.claude/bin/osm ledger append <<'JSON'
-{"schema_version":1,"run_id":"<run id>","change_id":"<change id or null>","stage":"review","phase_id":null,"kind":"stage_completed","operation_key":"report",
- "payload":{"status":"completed","confidence":{"percent":75},"verify":"passed","change_kind":"fix","ai_decisions":{"design":2,"scope":0},"invocations":[{"backend":"codex","role":"reviewer","skills":[],"status":"succeeded","accepted":3,"rejected":1,"unadjudicated":0,"mcp_tools":["context7:query-docs"]}]}}
+{"schema_version":1,"run_id":"<run id>","change_id":"<change id>","stage":"review","phase_id":null,"kind":"stage_completed","operation_key":"report","payload":{"status":"completed","confidence":{"percent":75},"verify":"passed","change_kind":"fix","tree_sha":"0123456789abcdef0123456789abcdef01234567","verify_sha256":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","gate":{"result":"pass","new":0,"baselined":0,"excepted":0,"square2_version":"0.1.1","report_sha256":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"},"ai_decisions":{"design":2},"invocations":[{"backend":"codex","role":"reviewer","skills":[],"status":"succeeded","accepted":3,"rejected":1,"unadjudicated":0}]}}
 JSON
 ~/.claude/bin/osm ledger append <<'JSON'
-{"schema_version":1,"run_id":"<run id>","change_id":"<change id>","stage":"plan","phase_id":null,"kind":"human_decision","operation_key":"<question slug>",
- "payload":{"decision_id":"<question slug>","topic":"<≤200 chars>","dimension":"design","options":["a","b"],"recommendation":"b","position":"run-hash-v1","initial_choice":null,"final_choice":"b","final_position":1,"blind":false}}
+{"schema_version":1,"run_id":"<run id>","change_id":"<change id>","stage":"plan","phase_id":null,"kind":"human_decision","operation_key":"<question slug>","payload":{"decision_id":"<question slug>","topic":"<≤200 chars>","dimension":"design","options":["a","b"],"recommendation":"b","position":"run-hash-v1","initial_choice":null,"final_choice":"b","final_position":1,"blind":false}}
+JSON
+~/.claude/bin/osm ledger append <<'JSON'
+{"schema_version":1,"run_id":"<run id>","change_id":"<change id>","stage":"review","phase_id":null,"kind":"outcome","operation_key":"gate-impl-<phase>","payload":{"target":{"change_id":"<change id>","stage":"impl","phase_id":"<phase>"},"assessment":"gate","result":"passed","critical_count":0}}
 JSON
 ```
-
-Fields hold ids, counts and short paraphrases: no source code, transcript text or absolute paths.
-
-The user reads it with `~/.claude/bin/osm ledger summary` in another terminal (not `!`).
+Ids/counts/paraphrases only (no code/transcripts/abs paths). View: `~/.claude/bin/osm ledger summary` (not `!`).

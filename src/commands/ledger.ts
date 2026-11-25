@@ -1,6 +1,7 @@
 import type { LedgerEvent } from '../utils/ledger/schema'
 import type { LessonResult } from '../utils/ledger/lessons'
 import type { LockedContext } from '../utils/ledger/store'
+import { sha256Hex } from '../utils/ledger/canonical'
 import { isStoredEvent, validateInput } from '../utils/ledger/schema'
 import { addLesson, adoptLesson, autoRetire, cardLines, effectiveState, lessonCard, lessonsDir, promoteLesson, queryLessons, queryLine, readLessons, retireLesson, showLesson } from '../utils/ledger/lessons'
 import { lessonTally } from '../utils/ledger/probe'
@@ -60,6 +61,7 @@ const USAGE = [
   'Usage: osm ledger <command>',
   '  status [--json]        recording state, ledger root, project id, counts',
   '  on | off               turn recording on or off for this user',
+  '  hash-report <path>       print the SHA-256 digest of the report bytes',
   '  run-id                 print a new run id for one stage invocation',
   '  append [--project-root PATH]   append one JSON event read from stdin',
   '  summary [--project ID|--all-projects] [--by-harness | --by DIM|decision [--window 7|30|90] [--runs N]] [--json] [--limit N] [--max-bytes N]',
@@ -515,6 +517,10 @@ function run(args: string[], opts: LedgerOptions): number {
       mkdirSync(root, { recursive: true, mode: 0o700 })
       if (!existsSync(disabledMarker(root))) writeFileSync(disabledMarker(root), '', { mode: 0o600 })
       out('Ledger: off')
+      return EXIT.ok
+    case 'hash-report':
+      if (args.length !== 2) throw new BoundsError('hash-report requires one report path')
+      out(sha256Hex(readFileSync(args[1])))
       return EXIT.ok
     case 'run-id':
       out(randomUUID())

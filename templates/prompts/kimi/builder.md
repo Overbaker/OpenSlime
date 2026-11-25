@@ -43,6 +43,14 @@ Total files changed: [N]
 All validations passed: [yes/no]
 ```
 
+For every VERIFY command, include this evidence block (a bare "passed" is treated as unverified; never alter the given VERIFY command). Immediately before your **first** VERIFY run, record `base <sha>` with `~/.claude/bin/osm verify-guard --print-tree` (keep that same `base <sha>` across any later re-runs), and after VERIFY compute `tree <sha7>` with `~/.claude/bin/osm verify-guard --print-tree | cut -c1-7`. Show the concrete artifact (test names/counts, endpoint response, or migration applied) proving the changed path ran:
+
+```text
+VERIFY <command>
+exit <n>  tree <sha7>  base <sha>
+<last ≤20 lines>
+```
+
 ## What NOT to Do
 
 - ❌ Do NOT refactor code outside the plan scope

@@ -43,10 +43,12 @@ description: 'codex/antigravity 按任务写代码，Claude 监控审查 + 归�
    - Review `tasks.md` and identify the **smallest verifiable phase**.
    - Do NOT complete all tasks at once—control context window.
    - Announce: "Implementing Phase X: [task group name]"
+   - If `.square2/` exists in the target repository or on any remote-tracking branch, read `~/.claude/.ccg/prompts/claude/osm-square2.md` §Impl.
 
 4. **Delegate Each Task**
    - **{{BACKEND_PRIMARY}}** — backend/logic/algorithm/tests. **{{FRONTEND_PRIMARY}}** — frontend/UI/styling only.
    - **Lessons and probes**: read `~/.claude/.ccg/prompts/claude/osm-ledger.md` once per phase. Per task, query lessons and add at most 2 adopted lines to the brief as `LESSONS:`. When a trial lesson matches and the budget allows, run the probe it describes. `--compare` (without `explore`) forces a probe, `--compare explore` runs only the comparison below, and `--no-probe` suppresses probes.
+   - **Frozen VERIFY**: compute `verify_sha256` (`sha256` of the task's planned single-line VERIFY command; record on ledger `stage_completed` as hex or `{task_id: hex}` map). The writer records `base_tree=$(~/.claude/bin/osm verify-guard --print-tree)` immediately before its **first** VERIFY run and reports it as `base <sha>` in the evidence block; Claude stores that reported `base_tree` (if missing, Claude records it immediately before the first VERIFY Claude runs itself). A fix round may not change VERIFY unless a ledger `human_decision` records the old text, new text and reason; otherwise reject the round and restore the planned VERIFY.
 
    **工作目录**：`{{WORKDIR}}` **必须通过 Bash 执行 `pwd`（Unix）或 `cd`（Windows CMD）获取当前工作目录的绝对路径**，禁止从 `$HOME` 或环境变量推断。如果用户通过 `/add-dir` 添加了多个工作区，先确定任务相关的工作区。
 
@@ -58,7 +60,8 @@ description: 'codex/antigravity 按任务写代码，Claude 监控审查 + 归�
    TASK: <task from tasks.md>
    FILES YOU MAY CHANGE: <explicit list>
    CONSTRAINTS: <constraints and PBT properties from the spec>
-   VERIFY: <test/build command to run before reporting>
+   VERIFY: <exact single-line command from tasks.md>
+   FINGERPRINT: verify_sha256=<sha256>
    EOF
    ```
    Run it with `Bash({ ..., run_in_background: true, timeout: 3600000 })`; the same waiting rules as Step 6.2 apply. Save each returned `SESSION_ID` to resume the same writer for fixes.
@@ -71,7 +74,9 @@ description: 'codex/antigravity 按任务写代码，Claude 监控审查 + 归�
 
 5. **Review the Diff**
    - `git diff` the task's files. Revert edits outside the allowed list.
-   - Check: within `tasks.md` scope, no unrelated modules touched, no new dependencies, existing interfaces intact, verify command passes.
+   - Check: within `tasks.md` scope, no unrelated modules touched, no new dependencies, existing interfaces intact.
+   - **VERIFY evidence**: accept a task **only** when the writer's report includes the VERIFY evidence block (`VERIFY <command>`, `exit 0  tree <sha7>  base <sha>`, last ≤20 output lines showing the changed path ran) with `exit 0` and `<sha7>` equal to the first 7 chars of current `~/.claude/bin/osm verify-guard --print-tree`. Use the reported `base <sha>` as `base_tree`; if `base <sha>` is missing, record `base_tree=$(~/.claude/bin/osm verify-guard --print-tree)` right before Claude runs VERIFY itself. If missing, non-zero, or stale tree, treat as unverified and Claude re-runs VERIFY itself before accepting.
+   - **Never-relax guard**: before accepting any fix round (after VERIFY has run once), confirm `verify_sha256` is unchanged and run `~/.claude/bin/osm verify-guard --base "$base_tree" --paths <files named by VERIFY>` using that recorded `base_tree` (omit `--paths` if VERIFY names no files). Any finding (exit 1) blocks the task until fixed or each `path:line` item is accepted via a ledger `human_decision`.
    - Apply the Fix Rules, then re-check the diff.
 
 6. **Independent Review**
@@ -109,13 +114,13 @@ description: 'codex/antigravity 按任务写代码，Claude 监控审查 + 归�
    - 输出含 `STALLED:` 或 `INCOMPLETE:`（wrapper 判定后端停滞或中断）：用返回的 `SESSION_ID` 执行一次 `resume <SESSION_ID>` 并说"继续"；没有 SESSION_ID 就重新发起一次。这算该模型的那一次重试。
 
    - Use a fresh session (no `resume`): the writer reviewing its own work misses the same things twice.
-   - With `--compare explore`, cross-check both reviewers' findings per candidate, then pick the candidate that passes VERIFY with fewer Critical findings (smaller diff on a tie). Only then bring the kept result into the main tree.
+   - With `--compare explore`, cross-check both reviewers' findings per candidate, then pick the candidate that passes VERIFY with fewer Critical findings (smaller diff on a tie). Only then bring the kept result into the main tree, and re-run the post gate (if loaded in Step 3) on the kept candidate after selection.
    - Handle Critical and Warning findings with the Fix Rules, then review the changed files again in a fresh session. Stop after 3 rounds and report to the user.
 
 7. **Update Task Status**
    - Mark completed task in `tasks.md`: `- [x] Task description`
    - Commit only if the user asked for it.
-   - When you do commit, end the message with the block below unless `$ARGUMENTS` contains `--no-trace`. Fill only what you know from this session; drop a line you cannot fill. Keep attribution lines your own instructions require, and put all trailers in one final block with no blank line inside it.
+   - When you do commit, end the message with the block below unless `$ARGUMENTS` contains `--no-trace`. Fill only what you know from this session; drop a line you cannot fill. Write `OSM-Reviewed: <tree_sha7> (Critical 0)` **only** when the committed tree equals the last `/osm:review` `tree_sha` with `critical_open = 0`—omit it otherwise (commits before the first `/osm:review` get no `OSM-Reviewed` trailer). Keep attribution lines your own instructions require, and put all trailers in one final block with no blank line inside it.
      ```
      via [OpenSlime](https://github.com/Overbaker/OpenSlime)
 
@@ -123,12 +128,13 @@ description: 'codex/antigravity 按任务写代码，Claude 监控审查 + 归�
      OSM-Specs: <capability names under the change's specs/, comma-separated>
      OSM-Writers: <backends that wrote the committed code; add claude if you fixed lines yourself>
      OSM-Reviewers: <backends whose review finished> (Critical <open count>)
+     OSM-Reviewed: <tree_sha7> (Critical 0)
      ```
    - If you open a pull request for this change, end its description with the same block unless `$ARGUMENTS` contains `--no-trace`. Never write these lines, or any generated-by note, into source files, comments or docs.
 
 
 8. **Archive on Completion**
-    - This step is the sole archive owner. Archive only when ALL tasks in `tasks.md` are marked `[x]` and `/osm:review` has passed with Critical = 0. If review has not passed, run `/osm:review` first and address its findings before archiving.
+    - This step is the sole archive owner. Compute the current `tree_sha` (snippet in `~/.claude/.ccg/prompts/claude/osm-report.md`). Archive only when ALL tasks in `tasks.md` are marked `[x]` and the current `tree_sha` equals the last `/osm:review` `tree_sha` with `critical_open = 0`. If any file changed after review or review has not passed with `critical_open = 0`, run `/osm:review` before archiving.
     - Call `/opsx:archive` internally to archive the change:
       ```
       /opsx:archive

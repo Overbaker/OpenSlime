@@ -33,6 +33,7 @@ description: '需求 → 约束集（codex + antigravity 交叉探索 + OpenSpec
 3. **Initial Codebase Assessment**
    - Use `{{MCP_SEARCH_TOOL}}` to scan codebase.
    - Determine project scale: single vs multi-directory structure.
+   - If `.square2/` exists in the target repository or on any remote-tracking branch, read `~/.claude/.ccg/prompts/claude/osm-square2.md` §Research.
 
 4. **Parallel Multi-Model Exploration**
    - Always run both {{BACKEND_PRIMARY}} and {{FRONTEND_PRIMARY}}, launched in ONE message with `run_in_background: true`. They answer independently; Claude cross-checks where they agree and disagree.

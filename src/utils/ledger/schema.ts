@@ -221,8 +221,36 @@ export function confidenceBand(percent: number): 'Low' | 'Medium' | 'High' {
   return percent < 50 ? 'Low' : percent >= 80 ? 'High' : 'Medium'
 }
 
+function gitSha(v: unknown, path: string): void {
+  if (typeof v !== 'string' || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/i.test(v)) fail(path, 'expected Git object id')
+}
+
+function sha256(v: unknown, path: string): void {
+  if (typeof v !== 'string' || !/^[a-f0-9]{64}$/i.test(v)) fail(path, 'expected SHA-256 hex digest')
+}
+
+function verifyDigest(v: unknown, path: string): void {
+  if (!isObj(v)) return sha256(v, path)
+  for (const [taskId, digest] of Object.entries(v)) {
+    id(taskId, path)
+    sha256(digest, `${path}.${taskId}`)
+  }
+}
+
+function gate(v: unknown, path: string): void {
+  const g = obj(v, path, ['result', 'new', 'baselined', 'excepted', 'square2_version', 'report_sha256'], ['exit_code'])
+  oneOf(g.result, `${path}.result`, ['pass', 'fail', 'skipped'])
+  if ('exit_code' in g) int(g.exit_code, `${path}.exit_code`)
+  const allowNull = g.result === 'skipped' || 'exit_code' in g
+  for (const key of ['new', 'baselined', 'excepted']) {
+    if (!(allowNull && g[key] === null)) int(g[key], `${path}.${key}`)
+  }
+  id(g.square2_version, `${path}.square2_version`)
+  if (!(allowNull && g.report_sha256 === null)) sha256(g.report_sha256, `${path}.report_sha256`)
+}
+
 function stageCompleted(p: unknown, path: string): Obj {
-  const o = obj(p, path, ['status', 'confidence', 'verify', 'invocations'], ['ai_decisions', 'change_kind'])
+  const o = obj(p, path, ['status', 'confidence', 'verify', 'invocations'], ['ai_decisions', 'change_kind', 'tree_sha', 'commit_sha', 'verify_sha256', 'gate'])
   oneOf(o.status, `${path}.status`, ['completed', 'failed', 'blocked', 'cancelled'])
   const c = obj(o.confidence, `${path}.confidence`, ['percent'], ['band'])
   const percent = int(c.percent, `${path}.confidence.percent`, 0, 95)
@@ -250,6 +278,10 @@ function stageCompleted(p: unknown, path: string): Obj {
     })
     return inv
   })
+  optional(o, 'tree_sha', path, gitSha)
+  optional(o, 'commit_sha', path, gitSha)
+  optional(o, 'verify_sha256', path, verifyDigest)
+  optional(o, 'gate', path, gate)
   optional(o, 'ai_decisions', path, aiDecisions)
   optional(o, 'change_kind', path, (v, q) => oneOf(v, q, CHANGE_KINDS))
   return o
@@ -326,7 +358,7 @@ function outcome(p: unknown, path: string): Obj {
   id(t.change_id, `${path}.target.change_id`)
   oneOf(t.stage, `${path}.target.stage`, ['research', 'plan', 'impl', 'review'])
   nullable(t.phase_id, `${path}.target.phase_id`, id)
-  oneOf(o.assessment, `${path}.assessment`, ['verify', 'review'])
+  oneOf(o.assessment, `${path}.assessment`, ['verify', 'review', 'gate'])
   oneOf(o.result, `${path}.result`, ['passed', 'failed', 'unknown'])
   nullable(o.critical_count, `${path}.critical_count`, (x, r) => int(x, r))
   return o

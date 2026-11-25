@@ -15,6 +15,7 @@ description: 'codex + antigravity 交叉分析 → 消除歧义 → 零决策可
 - Refer to `openspec/config.yaml` for project conventions.
 - **USER GUIDANCE RULE**: When suggesting next steps to the user, ALWAYS use OSM commands (`/osm:research`, `/osm:plan`, `/osm:impl`, `/osm:review`). NEVER suggest `/opsx:*` commands to the user. If OpenSpec CLI returns error messages referencing OPSX skills, translate them to `/osm:*` equivalents.
 - **TASKS FORMAT RULE**: When generating or modifying `tasks.md`, ALL tasks MUST use checkbox format (`- [ ] X.Y description`). Heading+bullet format will cause OpenSpec CLI to parse 0 tasks and block the workflow.
+- **VERIFY RULE**: Every task in `tasks.md` MUST write `Verify:` as one exact command line (no prose alternatives); `/osm:impl` freezes its SHA-256.
 - **PHASE BOUNDARY**: This phase ONLY generates OPSX artifacts (specs.md, design.md, tasks.md). Do NOT modify any source code. Do NOT proceed to implementation. After artifacts are generated, STOP and inform the user: "Plan complete. Run `/osm:impl` to start implementation."
 
 **Steps**
@@ -22,6 +23,7 @@ description: 'codex + antigravity 交叉分析 → 消除歧义 → 零决策可
    - Run `openspec list --json` to display Active Changes.
    - Confirm with user which change ID to refine.
    - Run `openspec status --change "<change_id>" --json` to review current state.
+   - If `.square2/` exists in the target repository or on any remote-tracking branch, read `~/.claude/.ccg/prompts/claude/osm-square2.md` §Plan.
 
 2. **Multi-Model Implementation Analysis (PARALLEL)**
    - Always run both {{BACKEND_PRIMARY}} and {{FRONTEND_PRIMARY}}, launched in ONE message with `run_in_background: true`. They answer independently; Claude cross-checks where they agree and disagree.
@@ -105,7 +107,7 @@ description: 'codex + antigravity 交叉分析 → 消除歧义 → 零决策可
      - [All finalized technology choices, algorithms, configurations]
 
      **Implementation Tasks**:
-     - [High-level task breakdown ready for tasks.md]
+     - [High-level task breakdown ready for tasks.md; each task includes a single-line Verify command]
      ```
 
    - Then call `/opsx:continue` internally to generate next artifacts:
@@ -125,6 +127,7 @@ A change is ready for implementation only when:
 - [ ] Zero ambiguities remain (verified by step 3 audit)
 - [ ] All PBT properties documented with falsification strategies
 - [ ] Artifacts (specs, design, tasks) generated via OpenSpec skills
+- [ ] Each task in tasks.md has a single-line Verify command
 - [ ] User has explicitly approved all constraint decisions
 
 **Reference**

@@ -90,6 +90,7 @@ Manual steps: [AGENTS.md](AGENTS.md).
 - **Traceable commits and pull requests.** When you ask `/osm:impl` to commit or open a pull request, the commit message or PR description ends with a `via OpenSlime` line and `OSM-Change`, `OSM-Specs`, `OSM-Writers` and `OSM-Reviewers` trailers. They never go into code, comments or docs. `/osm:impl --no-trace` leaves them out.
 - **Always cross-checked.** Research, plan and review run codex and antigravity in separate fresh sessions, and Claude compares where they agree and where they don't.
 - **Stage report.** Every run ends with a report in `${TMPDIR:-/tmp}/osm-reports/` that includes a confidence estimate (High/Medium/Low, %).
+- **Verified delivery & square² gate.** Each task freezes its single-line `VERIFY` (`osm verify-guard` blocks test weakening), requires command/exit/tree-SHA evidence, binds `/osm:review` and archive to `tree_sha` (with `OSM-Reviewed`), escalates confirmed findings up the Correct ladder, and loads `osm-square2.md` on repositories with `.square2/`.
 
 ## Ledger reference
 

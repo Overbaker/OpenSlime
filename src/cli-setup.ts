@@ -8,6 +8,7 @@ import { configMcp } from './commands/config-mcp'
 import { doctor, status } from './commands/doctor'
 import { diagnoseMcp, fixMcp } from './commands/diagnose-mcp'
 import { init } from './commands/init'
+import { verifyGuard } from './commands/verify-guard'
 import { ledger } from './commands/ledger'
 import { update } from './commands/update'
 import { showMainMenu } from './commands/menu'
@@ -175,6 +176,20 @@ export async function setupCommands(cli: CAC): Promise<void> {
   cli
     .command('status', 'Show CCG installation status')
     .action(async () => { await status() })
+
+  cli.command('verify-guard [...globs]', 'Check the working tree for weakened verification')
+    .option('--base <tree-ish>', 'Compare with this Git tree or commit')
+    .option('--print-tree', 'Print the current working tree object id')
+    .option('--paths <glob>', 'Check numeric thresholds in matching files (accepts multiple globs)')
+    .action((globs: string[], options) => {
+      if (globs.length && options.paths === undefined) {
+        process.stderr.write('verify-guard: path globs require --paths\n')
+        process.exitCode = 2
+        return
+      }
+      const paths = options.paths === undefined ? [] : [options.paths].flat().map(String)
+      process.exitCode = verifyGuard(rawOption('base', options.base), [...paths, ...globs], options.printTree)
+    })
 
   // Ledger: decisions, outcomes and lessons recorded at stage boundaries
   cli

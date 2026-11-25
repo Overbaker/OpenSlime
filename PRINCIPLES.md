@@ -7,7 +7,7 @@ Background: Anthropic's Applied AI team (22 Oct 2026) found a single agent loop 
 ## Rules
 
 1. **One main loop.** Claude plans, decides and talks to the user. No routers, planners or per-domain specialist agents in front of it.
-2. **Progressive disclosure.** Knowledge ships as on-demand skills, prompts as role files read at call time. Nothing is injected per turn: no hooks, no always-on routing rules.
+2. **Progressive disclosure.** Knowledge ships as on-demand skills, prompts as role files read at call time. Nothing is injected per turn: no hooks, no always-on routing rules. 'no hooks' means Claude Code hooks and per-turn injection; a target repository's own git hooks are that project's policy, which OSM neither installs nor requires.
 3. **External models only where they earn it.** Use them for:
    - independent verification, in a fresh session that never wrote the code;
    - parallel work with disjoint file scopes and its own context, discarded afterwards;
@@ -18,4 +18,4 @@ Background: Anthropic's Applied AI team (22 Oct 2026) found a single agent loop 
 
 ## Out of scope
 
-Agent swarms, per-team subagents, orchestrators on top of orchestrators, regex quality gates, and DSH as a host. Conway's law: an agent per team turns the architecture into the org chart.
+Agent swarms, per-team subagents, orchestrators on top of orchestrators, threshold-based regex quality scanners that are not born from a real failure (rules must be proven on a past mistake, as in square²), and DSH as a host. Conway's law: an agent per team turns the architecture into the org chart.

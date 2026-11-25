@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { canonicalJson } from '../canonical'
 import { CHANGE_KINDS, DIMENSIONS, isStoredEvent, ValidationError, validateInput } from '../schema'
 import { summarize } from '../summary'
 import { decision, inv, outcome, probe, stage } from './events'
@@ -327,5 +328,52 @@ describe('ledger dimensions: optional v1 fields', () => {
     })
     expect(withNulls.every(isStoredEvent)).toBe(true)
     expect(JSON.stringify(summarize(withNulls))).toBe(before)
+  })
+})
+
+describe('gate verdicts', () => {
+  const gate = { result: 'pass', new: 0, baselined: 2, excepted: 1, square2_version: '0.1.1', report_sha256: 'a'.repeat(64) }
+  it.each([{}, { tree_sha: 'b'.repeat(40) }, { commit_sha: 'c'.repeat(64), verify_sha256: 'd'.repeat(64), gate }])('P6: preserves v1 payload fields %j', (fields) => {
+    const input = stageEvent()
+    Object.assign(input.payload, fields)
+    const parsed = JSON.parse(canonicalJson(validateInput(input)))
+    expect(parsed.payload).toEqual({ ...stageEvent().payload, confidence: { percent: 75, band: 'Medium' }, ...fields })
+    expect(validateInput(parsed)).toEqual(parsed)
+  })
+
+  it('round-trips skipped and exit-code-only gates and per-task VERIFY hashes', () => {
+    const verify_sha256 = { '3.1': 'a'.repeat(64), '3.2': 'b'.repeat(64) }
+    const missing = { new: null, baselined: null, excepted: null, report_sha256: null }
+    for (const verdict of [{ result: 'skipped' }, { result: 'pass', exit_code: 0 }, { result: 'fail', exit_code: 1 }]) {
+      const event = stageEvent()
+      const fields = { verify_sha256, gate: { ...gate, ...missing, ...verdict } }
+      Object.assign(event.payload, fields)
+      const stored = JSON.parse(canonicalJson(validateInput(event)))
+      expect(validateInput(stored).payload).toMatchObject(fields)
+    }
+  })
+
+  it('rejects invalid exit codes, unsubstantiated nulls and malformed per-task hashes', () => {
+    const event = stageEvent()
+    for (const fields of [{ exit_code: 1.5 }, { new: null }, { report_sha256: null }, { result: 'skipped', excepted: -2 }]) {
+      event.payload.gate = { ...gate, ...fields }
+      rejects(event, /payload.gate/)
+    }
+    delete event.payload.gate
+    for (const hashes of [{ task: null }, { task: 'abc' }, ['a'.repeat(64)]]) {
+      event.payload.verify_sha256 = hashes
+      rejects(event, /verify_sha256/)
+    }
+  })
+
+  it('checks nested gate fields and accepts a gate assessment', () => {
+    const input = stageEvent()
+    for (const fields of [{ extra: 1 }, { new: -1 }, { result: 'unknown' }, { report_sha256: 'abcd' }]) {
+      input.payload.gate = { ...gate, ...fields }
+      rejects(input, /payload.gate/)
+    }
+    input.kind = 'outcome'
+    input.payload = { target: { change_id: 'c1', stage: 'review', phase_id: null }, assessment: 'gate', result: 'passed', critical_count: 0 }
+    expect(validateInput(input).payload.assessment).toBe('gate')
   })
 })
